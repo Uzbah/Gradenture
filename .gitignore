@@ -1,0 +1,17 @@
+# Environment files — never commit
+.env
+.env.local
+.env.production
+
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+
+# Build output
+dist/
+build/
+
+# Supabase local
+.supabase/
