@@ -10,52 +10,51 @@ A personal job application tracker (Kanban)
 Admin moderation panel
 Production domain: careerbridge.pk
 API base URL (prod): https://api.careerbridge.pk/api/v1
-API base URL (dev): http://localhost:5000/api/v1
+API base URL (dev): http://localhost:3001/api/v1
 
 
 Monorepo Layout
 careerbridge/
 ├── backend/
-│   ├── app.py                      ← Flask app factory
-│   ├── run.py                      ← Dev entrypoint
+│   ├── main.py                     ← FastAPI entry point
 │   ├── requirements.txt
 │   ├── .env                        ← never commit
 │   └── src/
 │       ├── config/
-│       │   ├── supabase.py
-│       │   ├── email.py
-│       │   └── rate_limiter.py
-│       ├── middleware/
-│       │   ├── authenticate.py
-│       │   ├── require_admin.py
-│       │   ├── require_super_admin.py
-│       │   └── error_handler.py
-│       ├── routes/
+│       │   └── supabase.py
+│       ├── dependencies/
+│       │   ├── auth.py             ← get_current_user, require_admin
+│       │   ├── rate_limit.py       ← slowapi limiter
+│       │   └── exceptions.py
+│       ├── routers/
 │       │   ├── __init__.py
+│       │   ├── auth.py
 │       │   ├── users.py
 │       │   ├── questions.py
 │       │   ├── reviews.py
 │       │   ├── companies.py
 │       │   ├── applications.py
 │       │   └── admin.py
-│       ├── controllers/
-│       │   ├── users_controller.py
-│       │   ├── questions_controller.py
-│       │   ├── reviews_controller.py
-│       │   ├── companies_controller.py
-│       │   ├── applications_controller.py
-│       │   └── admin_controller.py
 │       ├── services/
-│       │   ├── email_service.py
-│       │   ├── moderation_service.py
-│       │   └── upload_service.py
+│       │   ├── auth_service.py
+│       │   ├── auth_helpers.py
+│       │   ├── users_service.py
+│       │   ├── questions_service.py
+│       │   ├── reviews_service.py
+│       │   ├── companies_service.py
+│       │   ├── applications_service.py
+│       │   ├── admin_service.py
+│       │   └── email_service.py
 │       ├── schemas/
+│       │   ├── auth_schema.py
 │       │   ├── question_schema.py
 │       │   ├── review_schema.py
 │       │   ├── application_schema.py
-│       │   └── user_schema.py
-│       └── types/
-│           └── __init__.py
+│       │   ├── company_schema.py
+│       │   ├── user.py
+│       │   └── admin_schema.py
+│       └── utils/
+│           └── sanitize.py
 └── frontend/
     ├── vite.config.ts
     ├── tsconfig.json
@@ -116,7 +115,7 @@ careerbridge/
 
 Technology Stack
 Backend
-PackageVersionPurposePython3.11+RuntimeFlask3.xREST API frameworkPydanticv2Request validation & serializationsupabase-py2.xDB operationsPyJWT2.xJWT verificationFlask-Mail0.10+Transactional emailFlask-Limiter3.xRate limitingpython-dotenv1.xEnvironment variablesgunicorn21.xProduction WSGI server
+PackageVersionPurposePython3.10+RuntimeFastAPI0.115+REST API frameworkUvicorn0.34+ASGI serverPydanticv2Request validation & serializationsupabase-py2.xDB operationsPyJWT2.xJWT verificationslowapi0.1+Rate limitingpython-dotenv1.xEnvironment variables
 Frontend
 PackageVersionPurposeReact18+UIVitelatestBuild toolTypeScript5.xType safetyTanStack Queryv5Server state / cachingZustandv4Client UI stateTailwind CSSv3StylingReact Routerv6RoutingZodv3Form validation@hello-pangea/dndlatestKanban drag & drop
 Infrastructure
@@ -127,18 +126,18 @@ Read vs Write Split
 This is the most important architectural rule.
 
 React → Supabase directly (anon client): read-only, non-sensitive queries — listing approved questions, browsing companies, domain pages.
-React → Flask API (with JWT): ALL writes, ALL mutations, sensitive reads — submitting questions, moderation, application tracking, profile updates.
+React → FastAPI (with JWT): ALL writes, ALL mutations, sensitive reads — submitting questions, moderation, application tracking, profile updates.
 
-Never write directly to Supabase from React for mutations. Never proxy a simple public read through Flask unnecessarily.
+Never write directly to Supabase from React for mutations. Never proxy a simple public read through the API unnecessarily.
 Authentication Flow
 
 Supabase Auth issues a JWT on login (handled client-side by supabase-js).
 JWT is stored in Zustand authStore + localStorage.
-Every Flask request includes Authorization: Bearer <jwt> header.
-Flask authenticate decorator verifies the token using SUPABASE_JWT_SECRET.
-Admin routes additionally run require_admin which checks user_metadata.role.
+Every API request includes Authorization: Bearer <jwt> header.
+FastAPI get_current_user dependency verifies the token using SUPABASE_JWT_SECRET (HS256) or JWKS (ES256).
+Admin routes additionally use require_admin / require_super_admin which check public.users.role.
 
-The Flask API does not issue JWTs — only Supabase does. Flask only verifies them.
+The API does not issue JWTs — only Supabase does. The API only verifies them.
 Role System
 Roles live in two places and must match:
 
@@ -149,65 +148,45 @@ Valid roles: user | admin | super_admin
 Only super_admin can assign/revoke admin roles (POST /admin/users/:id/role).
 
 Backend Conventions
-Route → Controller → Service Pattern
+Router → Service Pattern
 
-Routes (routes/*.py): register blueprints, attach decorators, define path + HTTP method, call controller. No business logic.
-Controllers (controllers/*_controller.py): parse request, call service or Supabase, return response. Thin.
-Services (services/*_service.py): business logic spanning multiple DB operations (e.g. approve a question + send email). Use services when a controller action needs more than one step.
+Routers (routers/*.py): define path + HTTP method, attach Depends() for auth/validation, call service. No business logic.
+Services (services/*_service.py): business logic and Supabase calls. Raise AppError for HTTP errors.
+Dependencies (dependencies/*.py): get_current_user, require_admin, rate limiting.
 
-python# routes/questions.py
-from flask import Blueprint
-from src.middleware.authenticate import authenticate
-from src.middleware.validate import validate
+python# routers/questions.py
+from fastapi import APIRouter, Depends
+from src.dependencies.auth import get_current_user
 from src.schemas.question_schema import QuestionSchema
-from src.controllers.questions_controller import create
+from src.services import questions_service
 
-questions_bp = Blueprint('questions', __name__)
+router = APIRouter(prefix="/questions", tags=["Questions"])
 
-@questions_bp.route('/', methods=['POST'])
-@authenticate
-@validate(QuestionSchema)
-def create_question():
-    return create()
-python# controllers/questions_controller.py
-from flask import request, jsonify, g
+@router.post("/", status_code=201)
+def submit_question(body: QuestionSchema, user: dict = Depends(get_current_user)):
+    return questions_service.submit_question(user, body)
+python# services/questions_service.py
 from src.config.supabase import supabase
-from src.services.email_service import send_submission_confirmation
+from src.dependencies.exceptions import AppError
 
-def create():
-    data = request.validated_data   # set by @validate decorator
-    result = supabase.table('interview_questions').insert({
-        **data,
-        'submitted_by': g.user['sub'],
-        'status': 'pending'
+def submit_question(user: dict, data: QuestionSchema) -> dict:
+    result = supabase.table("interview_questions").insert({
+        **data.model_dump(),
+        "submitted_by": user["sub"],
+        "status": "pending",
     }).execute()
-    send_submission_confirmation(g.user['email'])
-    return jsonify({'id': result.data[0]['id'], 'status': 'pending', 'message': 'Submitted for review'}), 201
-Decorator Order (always this order)
-python@blueprint.route('/path', methods=['POST'])
-@authenticate
-@require_admin          # if needed
-@validate(SomeSchema)
-def handler():
-    ...
+    return {"id": result.data[0]["id"], "status": "pending", "message": "Submitted for review"}
+Dependency Order (authenticated + validated routes)
+python@router.post("/path")
+@limiter.limit("5/hour", key_func=user_rate_key)   # if rate-limited
+def handler(
+    request: Request,
+    body: SomeSchema,                              # Pydantic validates body → 400
+    user: dict = Depends(get_current_user),        # JWT auth → 401/403
+):
+    return some_service.action(user, body)
 Pydantic Validation
-All POST/PATCH payloads are validated server-side using Pydantic v2 models. The validate decorator wraps a Pydantic model and returns 400 with structured errors on failure:
-python# middleware/validate.py
-from functools import wraps
-from flask import request, jsonify
-from pydantic import ValidationError
-
-def validate(schema_class):
-    def decorator(f):
-        @wraps(f)
-        def wrapper(*args, **kwargs):
-            try:
-                request.validated_data = schema_class(**request.get_json()).model_dump()
-            except ValidationError as e:
-                return jsonify({'errors': e.errors()}), 400
-            return f(*args, **kwargs)
-        return wrapper
-    return decorator
+All POST/PATCH payloads are validated server-side using Pydantic v2 models passed as route parameters. A global exception handler maps RequestValidationError to 400 with `{ "errors": { "field": ["msg"] } }`.
 Pydantic Schemas (schemas/)
 python# schemas/question_schema.py
 from pydantic import BaseModel, field_validator
@@ -239,36 +218,27 @@ class QuestionSchema(BaseModel):
             raise ValueError('Must be YYYY-MM-01')
         return v
 Error Handling
-All controllers use try/except and rely on the global error handler registered in app.py:
-python# app.py
-from src.middleware.error_handler import handle_exception
-app.register_error_handler(Exception, handle_exception)
-python# middleware/error_handler.py
-from flask import jsonify
-import logging
+Services raise AppError(status_code, body) for expected HTTP errors. Unhandled exceptions are caught by a global handler in main.py returning `{ "error": "Internal server error" }` with 500.
+python# main.py
+@app.exception_handler(AppError)
+async def app_error_handler(_request, exc: AppError):
+    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
-def handle_exception(err):
-    logging.exception(err)
-    return jsonify({'error': 'Internal server error'}), 500
-App Factory (app.py)
-python# app.py
-from flask import Flask
-from src.routes.questions import questions_bp
-from src.routes.reviews import reviews_bp
-# ... other blueprints
-from src.middleware.error_handler import handle_exception
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(_request, exc: Exception):
+    logger.exception(exc)
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
+App Entry Point (main.py)
+python# main.py
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from src.routers import api_router
 
-def create_app():
-    app = Flask(__name__)
-
-    app.register_blueprint(questions_bp, url_prefix='/api/v1/questions')
-    app.register_blueprint(reviews_bp,   url_prefix='/api/v1/reviews')
-    # ... register all blueprints
-
-    app.register_error_handler(Exception, handle_exception)
-    return app
+app = FastAPI(title="CareerBridge API", version="1.0.0")
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173"], ...)
+app.include_router(api_router)   # prefix /api/v1, includes all sub-routers
 Supabase Client in Backend
-Use the service role key in the backend — it bypasses RLS. This is correct and intentional because the API enforces authorization through middleware, not RLS.
+Use the service role key in the backend — it bypasses RLS. This is correct and intentional because the API enforces authorization through dependencies, not RLS.
 python# config/supabase.py
 import os
 from supabase import create_client, Client
@@ -284,19 +254,16 @@ POST /questions, POST /reviews: 5 per user per hour
 POST /*/flag: 10 per user per hour
 Global: 100 requests/min/IP
 
-Use Flask-Limiter. Config in config/rate_limiter.py.
-python# config/rate_limiter.py
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-
-limiter = Limiter(key_func=get_remote_address, default_limits=['100 per minute'])
+Use slowapi. Config in dependencies/rate_limit.py.
+python# dependencies/rate_limit.py
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 Apply per-route:
-python@questions_bp.route('/', methods=['POST'])
-@authenticate
-@limiter.limit('5 per hour', key_func=lambda: g.user['sub'])
-@validate(QuestionSchema)
-def create_question():
-    return create()
+python@router.post("/")
+@limiter.limit("5/hour", key_func=user_rate_key)
+def submit_question(request: Request, body: QuestionSchema, user: dict = Depends(get_current_user)):
+    return questions_service.submit_question(user, body)
 Input Sanitization
 Strip HTML from all text fields before inserting to DB. Use bleach or a simple regex. This prevents XSS in rendered content.
 pythonimport re
@@ -407,21 +374,12 @@ Return { "upvoted": bool, "upvotes": int }.
 Use a Postgres transaction for the check+update to avoid race conditions.
 
 Email Notifications
-All emails are sent from email_service.py after moderation actions. Never send email directly in a route handler.
+All emails are sent from email_service.py after moderation actions. Never send email directly in a router handler.
 TriggerRecipientWhenQuestion/review submittedSubmitterAfter successful insertQuestion/review approvedSubmitterAfter admin approvesQuestion/review rejectedSubmitterAfter admin rejects (include admin_note)Edit requestedSubmitterAfter needs_edit action (include admin_note)Resubmission receivedAdminsWhen submitter resubmits a needs_edit itemApplication deadlineUser7 days and 1 day before deadlineAccount warnedUserAfter warn actionAccount suspendedUserAfter suspend action
 Deadline reminder emails require a background job (cron). Implement as a separate scheduled function — do not block the request lifecycle.
-python# config/email.py
-from flask_mail import Mail
-mail = Mail()
-
-# services/email_service.py
-from flask_mail import Message
-from src.config.email import mail
-
-def send_submission_confirmation(to_email: str):
-    msg = Message('Submission received', recipients=[to_email])
-    msg.body = 'Your submission is under review.'
-    mail.send(msg)
+python# services/email_service.py — uses SMTP (resend) via stdlib smtplib
+def send_submission_confirmation(to: str) -> None:
+    _send(to, "Submission received", "Your submission is under review.")
 
 Real-Time (Admin Queue)
 The admin moderation queue uses Supabase Realtime. The subscription is initialized once when an admin loads the queue page and torn down on unmount:
@@ -451,42 +409,32 @@ class AuthUser(TypedDict):
     sub: str        # Supabase user UUID
     email: str
     user_metadata: dict   # contains 'role'
-Use g.user (type AuthUser) in all authenticated controllers. Set it in the @authenticate decorator:
-python# middleware/authenticate.py
-from functools import wraps
-from flask import request, jsonify, g
-import jwt, os
+Use user dict (from get_current_user) in all authenticated services. Set by the auth dependency:
+python# dependencies/auth.py
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer
 
-def authenticate(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        token = request.headers.get('Authorization', '').removeprefix('Bearer ')
-        if not token:
-            return jsonify({'error': 'Unauthorized'}), 401
-        try:
-            g.user = jwt.decode(token, os.environ['SUPABASE_JWT_SECRET'], algorithms=['HS256'])
-        except jwt.PyJWTError:
-            return jsonify({'error': 'Unauthorized'}), 401
-        return f(*args, **kwargs)
-    return wrapper
+def get_current_user(credentials = Depends(HTTPBearer())) -> dict:
+    payload = _decode_token(credentials.credentials)
+    role = get_user_role(payload["sub"])   # authoritative from public.users
+    return {"sub": payload["sub"], "email": payload.get("email"), "role": role, "token": credentials.credentials}
 
 Environment Variables
 Backend .env
-FLASK_ENV=development
-PORT=5000
+NODE_ENV=development
+PORT=3001
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # never expose to frontend
 SUPABASE_JWT_SECRET=your-jwt-secret
-MAIL_SERVER=smtp.resend.com
-MAIL_PORT=465
-MAIL_USERNAME=resend
-MAIL_PASSWORD=your-api-key
-MAIL_DEFAULT_SENDER=noreply@careerbridge.pk
-RATE_LIMIT_STORAGE_URL=memory://
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=465
+SMTP_USER=resend
+SMTP_PASS=your-api-key
+EMAIL_FROM=noreply@careerbridge.pk
 Frontend .env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key             # safe to expose (RLS enforces access)
-VITE_API_BASE_URL=http://localhost:5000/api/v1
+VITE_API_BASE_URL=http://localhost:3001/api/v1
 Critical: SUPABASE_SERVICE_ROLE_KEY must never appear in the frontend or any client-side code. It bypasses all RLS. Only the backend uses it.
 
 Database Migrations
@@ -506,28 +454,29 @@ supabase start
 
 # 2. Start backend
 cd backend
-python -m venv venv && source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-flask run --port 5000            # or: python run.py
+python main.py                                      # or: uvicorn main:app --reload --port 3001
 
 # 3. Start frontend
 cd frontend && npm run dev       # runs Vite on :5173
-Local Supabase Studio is available at http://localhost:54323 after supabase start.
+Local Supabase Studio: http://localhost:54323
+API docs (Swagger): http://localhost:3001/docs
 
 Common Mistakes to Avoid
 
 Never use the service role key in the frontend. It bypasses all RLS and exposes the entire database.
-Never write mutations directly from React to Supabase. All writes go through Flask.
+Never write mutations directly from React to Supabase. All writes go through the FastAPI API.
 Never skip Pydantic validation on the backend. Frontend validation is UX only — always re-validate server-side.
 Never expose submitted_by for anonymous content. Always strip it in the API response before sending.
 Never render question_text or review_text as raw HTML. Always treat user content as plain text to prevent XSS.
 Never allow cross-user application access. RLS enforces user_id = auth.uid() but the API should also verify ownership before any update/delete.
-Never hardcode role checks in frontend UI only. Backend decorators are the authoritative guard. Frontend role checks are UX convenience only.
+Never hardcode role checks in frontend UI only. Backend dependencies are the authoritative guard. Frontend role checks are UX convenience only.
 Never skip the onboarding_complete redirect. If a user skips onboarding and lands on /dashboard, their profile data will be missing and break personalization logic.
 Never put TanStack Query data in Zustand. It creates stale data bugs. Server state lives in TanStack Query, client/UI state lives in Zustand.
 The asked_date field is always YYYY-MM-01. If a full date is being stored here, the Pydantic field_validator is missing.
 Never send emails directly in a route handler. Always delegate to email_service.py.
-Always use @wraps(f) in decorators. Without it, Flask's routing breaks when multiple routes share the same function name.
+Use Depends(get_current_user) for protected routes — never parse JWT manually in routers.
 
 
 Out of Scope (Do Not Build Yet)

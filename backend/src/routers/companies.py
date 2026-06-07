@@ -1,0 +1,27 @@
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
+
+from src.dependencies.auth import get_current_user
+from src.schemas.company_schema import CompanySchema
+from src.services import companies_service
+
+router = APIRouter(prefix="/companies", tags=["Companies"])
+
+
+@router.get("/")
+def list_companies(page: int = 1, limit: int = 20) -> dict:
+    return companies_service.list_companies(page, limit)
+
+
+@router.get("/{company_id}")
+def get_company(company_id: str) -> dict:
+    return companies_service.get_company(company_id)
+
+
+@router.post("/", status_code=201)
+def submit_company(
+    body: CompanySchema,
+    _user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    return companies_service.submit_company(body)
