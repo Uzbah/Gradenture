@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -29,23 +30,13 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173"] if os.getenv("NODE_ENV") == "development" else [],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(api_router)
-
-
-@app.get("/")
-def root() -> dict:
-    return {
-        "name":    "CareerBridge API",
-        "version": "1.0.0",
-        "docs":    "/docs",
-        "api":     "/api/v1",
-    }
 
 
 @app.get("/api/v1")
@@ -93,6 +84,10 @@ async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSON
     logger.exception(exc)
     return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
+
+_dist = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+if os.path.exists(_dist):
+    app.mount("/", StaticFiles(directory=_dist, html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
