@@ -4,6 +4,7 @@ from .admin import router as admin_router
 from .applications import router as applications_router
 from .auth import router as auth_router
 from .companies import router as companies_router
+from .prep import router as prep_router
 from .questions import router as questions_router
 from .resume import router as resume_router
 from .reviews import router as reviews_router
@@ -16,5 +17,6 @@ api_router.include_router(questions_router)
 api_router.include_router(reviews_router)
 api_router.include_router(applications_router)
 api_router.include_router(companies_router)
+api_router.include_router(prep_router)
 api_router.include_router(resume_router)
 api_router.include_router(admin_router)
