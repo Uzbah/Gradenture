@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
 import { api } from "../api";
+import Logo from "../components/Logo";
 
 export default function Login() {
   const { login } = useAuth();
@@ -35,6 +36,7 @@ export default function Login() {
 
   return (
     <div className="page-narrow">
+      <Logo />
       <div className="card">
         <h1>Log in to CareerBridge</h1>
         <form onSubmit={submit}>

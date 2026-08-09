@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import Logo from "../components/Logo";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -22,6 +23,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="page-narrow">
+      <Logo />
       <div className="card">
         <h1>Forgot password</h1>
         <form onSubmit={submit}>
