@@ -78,6 +78,37 @@ cd ..\backend; python main.py   # serves both on :3001
 `frontend/dist` is auto-detected — if present, FastAPI serves it at `/`. No CORS needed in prod
 (`.env.production` sets `VITE_API_BASE_URL=/api/v1`).
 
+## Docker
+
+Supabase is a hosted service, not a container here — you still need a Supabase
+project and `backend/.env` / `frontend/.env` filled in (see above) before
+running either of these.
+
+### Development (hot reload, two containers)
+
+```bash
+docker compose up --build
+```
+
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3001/api/v1 (Swagger at `/docs`)
+
+Source is bind-mounted into both containers, so edits on your host are picked
+up live (Vite HMR, uvicorn `--reload`). Re-run with `--build` whenever
+`requirements.txt` or `package.json` changes; otherwise plain `docker compose up`
+is enough. Stop with `docker compose down`.
+
+### Production (single container)
+
+The root `Dockerfile` multi-stage builds the frontend and bakes the static
+files into the backend image, matching the "serving frontend from backend"
+setup above — one container, one process, port 3001:
+
+```bash
+docker build -t gradenture .
+docker run -p 3001:3001 --env-file backend/.env gradenture
+```
+
 ## Features
 
 - **Auth & onboarding** — email/password + verification, forgot/reset password, domain/skill/goal/university wizard
