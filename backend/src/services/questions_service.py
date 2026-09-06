@@ -1,4 +1,4 @@
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.question_schema import QuestionSchema, FlagSchema
 from src.utils.sanitize import clean_text
@@ -43,17 +43,15 @@ def list_questions(
 
 
 def get_question(question_id: str) -> dict:
-    result = (
+    row = maybe_row(
         supabase.table("interview_questions")
         .select("*")
         .eq("id", question_id)
         .eq("status", "approved")
-        .maybe_single()
-        .execute()
     )
-    if not result.data:
+    if not row:
         raise AppError(404, {"error": "Question not found"})
-    return {"data": _sanitize(result.data)}
+    return {"data": _sanitize(row)}
 
 
 def submit_question(user: dict, data: QuestionSchema) -> dict:
@@ -76,16 +74,14 @@ def submit_question(user: dict, data: QuestionSchema) -> dict:
 def upvote_question(user: dict, question_id: str) -> dict:
     user_id = user["sub"]
 
-    existing = (
+    existing = maybe_row(
         supabase.table("question_upvotes")
         .select("question_id")
         .eq("question_id", question_id)
         .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
     )
 
-    if existing.data:
+    if existing:
         (
             supabase.table("question_upvotes")
             .delete()

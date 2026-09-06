@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timezone
 from threading import Lock
 
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +31,9 @@ def sync_user_metadata_role(user_id: str, role: str = "user") -> None:
 
 def get_user_role(user_id: str) -> str:
     """Authoritative role from public.users (matches admin role updates)."""
-    result = (
-        supabase.table("users")
-        .select("role")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if result.data and result.data.get("role"):
-        return result.data["role"]
+    row = maybe_row(supabase.table("users").select("role").eq("id", user_id))
+    if row and row.get("role"):
+        return row["role"]
     return "user"
 
 

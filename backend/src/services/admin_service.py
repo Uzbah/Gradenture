@@ -1,8 +1,27 @@
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
-from src.schemas.admin_schema import ModerateSchema, UpdateRoleSchema
+from src.schemas.admin_schema import FlagActionSchema, ModerateSchema, UpdateRoleSchema
 from src.services.auth_helpers import invalidate_ban_cache
 from src.utils.sanitize import clean_text
+
+_FLAG_TABLES = {"question": "interview_questions", "review": "interview_reviews"}
+
+
+def _audit(
+    actor_id: str,
+    action: str,
+    target_type: str,
+    target_id: str,
+    detail: dict | None = None,
+) -> None:
+    """Every admin mutation records here. Failures surface loudly, by design."""
+    supabase.table("admin_audit_log").insert({
+        "actor_id":    actor_id,
+        "action":      action,
+        "target_type": target_type,
+        "target_id":   target_id,
+        "detail":      detail,
+    }).execute()
 
 
 def get_queue() -> dict:
@@ -22,18 +41,24 @@ def get_queue() -> dict:
         .execute()
     ).data
 
-    return {"data": {"questions": questions, "reviews": reviews}}
+    companies = (
+        supabase.table("companies")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at")
+        .execute()
+    ).data
+
+    return {"data": {"questions": questions, "reviews": reviews, "companies": companies}}
 
 
 def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dict:
-    q = (
+    q = maybe_row(
         supabase.table("interview_questions")
         .select("submitted_by, status")
         .eq("id", question_id)
-        .maybe_single()
-        .execute()
     )
-    if not q.data:
+    if not q:
         raise AppError(404, {"error": "Question not found"})
 
     admin_note = clean_text(data.admin_note or "")
@@ -45,18 +70,16 @@ def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dic
         "reviewed_at": "now()",
     }).eq("id", question_id).execute()
 
+    _audit(user["sub"], f"question_{data.status}", "question", question_id,
+           {"note": admin_note or None})
     return {"message": f"Question {data.status}"}
 
 
 def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
-    r = (
-        supabase.table("interview_reviews")
-        .select("submitted_by")
-        .eq("id", review_id)
-        .maybe_single()
-        .execute()
+    r = maybe_row(
+        supabase.table("interview_reviews").select("submitted_by").eq("id", review_id)
     )
-    if not r.data:
+    if not r:
         raise AppError(404, {"error": "Review not found"})
 
     admin_note = clean_text(data.admin_note or "")
@@ -68,10 +91,12 @@ def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
         "reviewed_at": "now()",
     }).eq("id", review_id).execute()
 
+    _audit(user["sub"], f"review_{data.status}", "review", review_id,
+           {"note": admin_note or None})
     return {"message": f"Review {data.status}"}
 
 
-def moderate_company(company_id: str) -> dict:
+def moderate_company(user: dict, company_id: str) -> dict:
     result = (
         supabase.table("companies")
         .update({"status": "approved"})
@@ -80,7 +105,47 @@ def moderate_company(company_id: str) -> dict:
     )
     if not result.data:
         raise AppError(404, {"error": "Company not found"})
+
+    _audit(user["sub"], "company_approved", "company", company_id)
     return {"message": "Company approved"}
+
+
+def list_flags() -> dict:
+    flags = (
+        supabase.table("content_flags")
+        .select("*")
+        .eq("status", "open")
+        .order("created_at")
+        .execute()
+    ).data
+
+    # ponytail: one lookup per flag — open flags are few. Batch per content_type if the queue grows.
+    for flag in flags:
+        row = (
+            supabase.table(_FLAG_TABLES[flag["content_type"]])
+            .select("*")
+            .eq("id", flag["content_id"])
+            .limit(1)
+            .execute()
+        )
+        flag["content"] = row.data[0] if row.data else None
+
+    return {"data": flags}
+
+
+def resolve_flag(user: dict, flag_id: str, data: FlagActionSchema) -> dict:
+    result = (
+        supabase.table("content_flags")
+        .update({"status": data.status})
+        .eq("id", flag_id)
+        .eq("status", "open")
+        .execute()
+    )
+    if not result.data:
+        raise AppError(404, {"error": "Open flag not found"})
+
+    _audit(user["sub"], f"flag_{data.status}", "flag", flag_id)
+    return {"message": f"Flag {data.status}"}
 
 
 def list_users(page: int = 1, limit: int = 20) -> dict:
@@ -98,38 +163,52 @@ def list_users(page: int = 1, limit: int = 20) -> dict:
     return {"data": result.data, "count": result.count}
 
 
-def update_user_role(user_id: str, data: UpdateRoleSchema) -> dict:
+def _require_user(user_id: str) -> None:
+    if not maybe_row(supabase.table("users").select("id").eq("id", user_id)):
+        raise AppError(404, {"error": "User not found"})
+
+
+def update_user_role(actor: dict, user_id: str, data: UpdateRoleSchema) -> dict:
+    # Keeps at least one super admin: the actor is one and cannot demote themselves.
+    if user_id == actor["sub"] and data.role != "super_admin":
+        raise AppError(400, {"error": "You cannot remove your own super admin role"})
+
+    _require_user(user_id)
     supabase.table("users").update({"role": data.role}).eq("id", user_id).execute()
     supabase.auth.admin.update_user_by_id(
         user_id, {"user_metadata": {"role": data.role}}
     )
+
+    _audit(actor["sub"], "role_updated", "user", user_id, {"role": data.role})
     return {"message": f"Role updated to {data.role}"}
 
 
-def warn_user(user_id: str) -> dict:
-    user = (
-        supabase.table("users")
-        .select("id")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if not user.data:
-        raise AppError(404, {"error": "User not found"})
-    return {"message": "User warned"}
+def warn_user(actor: dict, user_id: str) -> dict:
+    _require_user(user_id)
+    # ponytail: recorded only — delivery needs the notification service wired up.
+    _audit(actor["sub"], "user_warned", "user", user_id)
+    return {"message": "Warning recorded"}
 
 
-def suspend_user(user_id: str) -> dict:
-    user = (
-        supabase.table("users")
-        .select("id")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if not user.data:
-        raise AppError(404, {"error": "User not found"})
+def suspend_user(actor: dict, user_id: str) -> dict:
+    if user_id == actor["sub"]:
+        raise AppError(400, {"error": "You cannot suspend yourself"})
 
+    _require_user(user_id)
     supabase.auth.admin.update_user_by_id(user_id, {"ban_duration": "876600h"})
+    # ponytail: display mirror — auth.users stays the source of truth for login blocking.
+    supabase.table("users").update({"suspended_at": "now()"}).eq("id", user_id).execute()
     invalidate_ban_cache(user_id)
+
+    _audit(actor["sub"], "user_suspended", "user", user_id)
     return {"message": "User suspended"}
+
+
+def unsuspend_user(actor: dict, user_id: str) -> dict:
+    _require_user(user_id)
+    supabase.auth.admin.update_user_by_id(user_id, {"ban_duration": "none"})
+    supabase.table("users").update({"suspended_at": None}).eq("id", user_id).execute()
+    invalidate_ban_cache(user_id)
+
+    _audit(actor["sub"], "user_unsuspended", "user", user_id)
+    return {"message": "User unsuspended"}

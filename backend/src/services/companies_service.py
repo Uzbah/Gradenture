@@ -1,6 +1,6 @@
 import re
 
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.company_schema import CompanySchema
 
@@ -26,17 +26,15 @@ def list_companies(page: int = 1, limit: int = 20) -> dict:
 
 
 def get_company(company_id: str) -> dict:
-    result = (
+    row = maybe_row(
         supabase.table("companies")
         .select("*")
         .eq("id", company_id)
         .eq("status", "approved")
-        .maybe_single()
-        .execute()
     )
-    if not result.data:
+    if not row:
         raise AppError(404, {"error": "Company not found"})
-    return {"data": result.data}
+    return {"data": row}
 
 
 def submit_company(data: CompanySchema) -> dict:
@@ -44,14 +42,10 @@ def submit_company(data: CompanySchema) -> dict:
     if not name:
         raise AppError(400, {"errors": {"name": ["must not be empty"]}})
 
-    existing = (
-        supabase.table("companies")
-        .select("id")
-        .ilike("name", name)
-        .maybe_single()
-        .execute()
+    existing = maybe_row(
+        supabase.table("companies").select("id").ilike("name", name)
     )
-    if existing.data:
+    if existing:
         raise AppError(409, {"error": "Company already exists"})
 
     result = supabase.table("companies").insert({

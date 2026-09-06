@@ -14,3 +14,13 @@ def _init() -> Client:
 
 
 supabase: Client = _init()
+
+
+def maybe_row(query) -> dict | None:
+    """Single row or None.
+
+    supabase-py 2.x returns None instead of a response object when
+    maybe_single() matches no rows, so `.data` on it raises AttributeError.
+    """
+    result = query.maybe_single().execute()
+    return result.data if result else None

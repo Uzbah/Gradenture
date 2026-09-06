@@ -1,22 +1,16 @@
 import bleach
 
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.user import OnboardingSchema
 
 
 def get_me(user: dict) -> dict:
     user_id = user["sub"]
-    result = (
-        supabase.table("users")
-        .select("*")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if not result.data:
+    row = maybe_row(supabase.table("users").select("*").eq("id", user_id))
+    if not row:
         raise AppError(404, {"error": "User not found"})
-    return {"data": result.data}
+    return {"data": row}
 
 
 def get_domains() -> dict:

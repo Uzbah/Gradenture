@@ -1,4 +1,4 @@
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 
 # ponytail: static topic lists keyed by domain slug; move to an admin-curated
@@ -82,16 +82,12 @@ TOPICS: dict[str, list[str]] = {
 
 
 def _get_user_domain(user_id: str) -> tuple[str, str]:
-    result = (
-        supabase.table("users")
-        .select("domain_id, domains(slug)")
-        .eq("id", user_id)
-        .maybe_single()
-        .execute()
+    row = maybe_row(
+        supabase.table("users").select("domain_id, domains(slug)").eq("id", user_id)
     )
-    if not result.data or not result.data.get("domain_id"):
+    if not row or not row.get("domain_id"):
         raise AppError(400, {"error": "Complete onboarding first"})
-    return result.data["domain_id"], result.data["domains"]["slug"]
+    return row["domain_id"], row["domains"]["slug"]
 
 
 def get_prep(user: dict) -> dict:

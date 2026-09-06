@@ -61,7 +61,12 @@ export interface Company { id: string; name: string; slug: string; website?: str
 export interface User {
   id: string; email: string; role: "user" | "admin" | "super_admin";
   domain_id?: string; skill_level?: string; goal?: string; university?: string;
-  onboarding_complete: boolean;
+  onboarding_complete: boolean; suspended_at?: string | null;
+}
+export interface Flag {
+  id: string; content_type: "question" | "review"; content_id: string;
+  reason: string; status: string; created_at: string;
+  content?: (Question & Review) | null;
 }
 export interface Question {
   id: string; domain_id: string; company_id: string; role_title: string;
