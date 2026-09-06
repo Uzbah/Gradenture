@@ -4,17 +4,19 @@ import { useAuth } from "../auth";
 import { useLookups } from "../lookups";
 
 export default function Admin() {
-  const [tab, setTab] = useState<"queue" | "flags" | "users">("queue");
+  const [tab, setTab] = useState<"queue" | "flags" | "companies" | "users">("queue");
   return (
     <>
       <h1>Admin Panel</h1>
       <div className="tabs">
         <button className={tab === "queue" ? "active" : ""} onClick={() => setTab("queue")}>Moderation queue</button>
         <button className={tab === "flags" ? "active" : ""} onClick={() => setTab("flags")}>Flags</button>
+        <button className={tab === "companies" ? "active" : ""} onClick={() => setTab("companies")}>Companies</button>
         <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Users</button>
       </div>
       {tab === "queue" && <Queue />}
       {tab === "flags" && <Flags />}
+      {tab === "companies" && <CompaniesAdmin />}
       {tab === "users" && <Users />}
     </>
   );
@@ -158,6 +160,158 @@ function Flags() {
         </div>
       ))}
     </>
+  );
+}
+
+function CompaniesAdmin() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [q, setQ] = useState("");
+  const [editing, setEditing] = useState<Company | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [merging, setMerging] = useState<Company | null>(null);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  const load = () => {
+    const params = new URLSearchParams({ limit: "50" });
+    if (q.trim()) params.set("q", q.trim());
+    api<{ data: Company[] }>(`/admin/companies?${params}`)
+      .then((r) => setCompanies(r.data))
+      .catch((e) => setError(e.message));
+  };
+  useEffect(() => {
+    const t = setTimeout(load, 250);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const save = async (body: Partial<Company>, id?: string) => {
+    setError(""); setInfo("");
+    try {
+      if (id) await api(`/admin/companies/${id}`, { method: "PATCH", body });
+      else await api("/admin/companies", { method: "POST", body });
+      setInfo(id ? "Company updated" : "Company created");
+      setEditing(null); setCreating(false);
+      load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const merge = async (from: Company, intoId: string) => {
+    const into = companies.find((c) => c.id === intoId);
+    if (!into || !window.confirm(
+      `Merge "${from.name}" into "${into.name}"? All its questions and reviews move across and "${from.name}" is deleted. This cannot be undone.`
+    )) return;
+    setError(""); setInfo("");
+    try {
+      const r = await api<{ message: string }>(`/admin/companies/${from.id}/merge`,
+        { method: "POST", body: { into_id: intoId } });
+      setInfo(r.message);
+      setMerging(null);
+      load();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <>
+      {error && <p className="error">{error}</p>}
+      {info && <p className="success">{info}</p>}
+
+      <div className="row" style={{ justifyContent: "space-between", marginBottom: "0.75rem" }}>
+        <input placeholder="Search companies…" value={q}
+               onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
+        <button className="small" onClick={() => { setCreating(true); setEditing(null); }}>
+          Add company
+        </button>
+      </div>
+
+      {creating && <CompanyForm onSave={(b) => save(b)} onCancel={() => setCreating(false)} />}
+
+      <div className="card">
+        <table>
+          <thead>
+            <tr><th>Name</th><th>Industry</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {companies.map((c) => (
+              <tr key={c.id}>
+                <td>{c.name}</td>
+                <td>{c.industry ?? "—"}</td>
+                <td>
+                  {c.status === "approved"
+                    ? <span className="badge easy">approved</span>
+                    : <span className="badge">pending</span>}
+                </td>
+                <td>
+                  <div className="row">
+                    <button className="small secondary"
+                            onClick={() => { setEditing(c); setCreating(false); }}>Edit</button>
+                    {c.status !== "approved" && (
+                      <button className="small" onClick={() => save({ status: "approved" }, c.id)}>
+                        Approve
+                      </button>
+                    )}
+                    <button className="small secondary"
+                            onClick={() => setMerging(merging?.id === c.id ? null : c)}>Merge</button>
+                  </div>
+                  {merging?.id === c.id && (
+                    <select defaultValue="" style={{ marginTop: "0.4rem" }}
+                            onChange={(e) => e.target.value && merge(c, e.target.value)}>
+                      <option value="">Merge into…</option>
+                      {companies.filter((o) => o.id !== c.id).map((o) => (
+                        <option key={o.id} value={o.id}>{o.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {editing && (
+        <CompanyForm company={editing} onSave={(b) => save(b, editing.id)}
+                     onCancel={() => setEditing(null)} />
+      )}
+    </>
+  );
+}
+
+function CompanyForm({ company, onSave, onCancel }: {
+  company?: Company;
+  onSave: (body: Partial<Company>) => void;
+  onCancel: () => void;
+}) {
+  const [form, setForm] = useState({
+    name: company?.name ?? "",
+    industry: company?.industry ?? "",
+    website: company?.website ?? "",
+    logo_url: company?.logo_url ?? "",
+  });
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  return (
+    <form className="card mt" onSubmit={(e) => {
+      e.preventDefault();
+      // drop blanks so PATCH never clears a field the admin left untouched
+      onSave(Object.fromEntries(Object.entries(form).filter(([, v]) => v !== "")));
+    }}>
+      <h3>{company ? `Edit ${company.name}` : "New company"}</h3>
+      <div className="filters mt">
+        <input required placeholder="Name" value={form.name} onChange={set("name")} />
+        <input placeholder="Industry" value={form.industry} onChange={set("industry")} />
+        <input type="url" placeholder="Website" value={form.website} onChange={set("website")} />
+        <input type="url" placeholder="Logo URL" value={form.logo_url} onChange={set("logo_url")} />
+      </div>
+      <div className="row mt">
+        <button type="submit">{company ? "Save changes" : "Create"}</button>
+        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
   );
 }
 

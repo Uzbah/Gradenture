@@ -4,6 +4,11 @@ from fastapi import APIRouter, Depends
 
 from src.dependencies.auth import require_admin, require_super_admin
 from src.schemas.admin_schema import FlagActionSchema, ModerateSchema, UpdateRoleSchema
+from src.schemas.company_schema import (
+    CompanyAdminCreateSchema,
+    CompanyMergeSchema,
+    CompanyUpdateSchema,
+)
 from src.services import admin_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -32,12 +37,41 @@ def moderate_review(
     return admin_service.moderate_review(user, review_id, body)
 
 
+@router.get("/companies")
+def list_companies(
+    _user: Annotated[dict, Depends(require_admin)],
+    page: int = 1,
+    limit: int = 20,
+    q: str | None = None,
+    status: str | None = None,
+) -> dict:
+    return admin_service.list_companies(page, limit, q, status)
+
+
+@router.post("/companies", status_code=201)
+def create_company(
+    body: CompanyAdminCreateSchema,
+    user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.create_company(user, body)
+
+
 @router.patch("/companies/{company_id}")
 def moderate_company(
     company_id: str,
     user: Annotated[dict, Depends(require_admin)],
+    body: CompanyUpdateSchema | None = None,
 ) -> dict:
-    return admin_service.moderate_company(user, company_id)
+    return admin_service.moderate_company(user, company_id, body)
+
+
+@router.post("/companies/{company_id}/merge")
+def merge_companies(
+    company_id: str,
+    body: CompanyMergeSchema,
+    user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.merge_companies(user, company_id, body)
 
 
 @router.get("/flags")

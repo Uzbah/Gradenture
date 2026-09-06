@@ -1,6 +1,12 @@
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.admin_schema import FlagActionSchema, ModerateSchema, UpdateRoleSchema
+from src.schemas.company_schema import (
+    CompanyAdminCreateSchema,
+    CompanyMergeSchema,
+    CompanyUpdateSchema,
+)
+from src.services.companies_service import _slug
 from src.services.auth_helpers import invalidate_ban_cache
 from src.utils.sanitize import clean_text
 
@@ -96,18 +102,90 @@ def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
     return {"message": f"Review {data.status}"}
 
 
-def moderate_company(user: dict, company_id: str) -> dict:
+def moderate_company(
+    user: dict, company_id: str, data: CompanyUpdateSchema | None = None
+) -> dict:
+    fields = data.model_dump(exclude_none=True) if data else {}
+    # An empty body still just approves, keeping the queue's behaviour.
+    fields.setdefault("status", "approved")
+    if "name" in fields:
+        fields["name"] = fields["name"].strip()
+        fields["slug"] = _slug(fields["name"])
+
     result = (
-        supabase.table("companies")
-        .update({"status": "approved"})
-        .eq("id", company_id)
-        .execute()
+        supabase.table("companies").update(fields).eq("id", company_id).execute()
     )
     if not result.data:
         raise AppError(404, {"error": "Company not found"})
 
-    _audit(user["sub"], "company_approved", "company", company_id)
-    return {"message": "Company approved"}
+    action = "company_updated" if len(fields) > 1 else "company_approved"
+    _audit(user["sub"], action, "company", company_id, fields)
+    return {"message": "Company updated", "data": result.data[0]}
+
+
+def list_companies(
+    page: int = 1, limit: int = 20, q: str | None = None, status: str | None = None
+) -> dict:
+    """Admin view: every company, not only approved ones."""
+    page = max(1, page)
+    limit = min(50, max(1, limit))
+    offset = (page - 1) * limit
+
+    query = supabase.table("companies").select("*", count="exact")
+    if q:
+        query = query.ilike("name", f"%{q}%")
+    if status:
+        query = query.eq("status", status)
+
+    result = query.order("name").range(offset, offset + limit - 1).execute()
+    return {"data": result.data, "count": result.count}
+
+
+def create_company(user: dict, data: CompanyAdminCreateSchema) -> dict:
+    name = data.name.strip()
+    if not name:
+        raise AppError(400, {"errors": {"name": ["must not be empty"]}})
+    if maybe_row(supabase.table("companies").select("id").ilike("name", name)):
+        raise AppError(409, {"error": "Company already exists"})
+
+    result = supabase.table("companies").insert({
+        **data.model_dump(exclude_none=True),
+        "name":   name,
+        "slug":   _slug(name),
+        "status": "approved",   # admin-created companies skip the queue
+    }).execute()
+
+    company = result.data[0]
+    _audit(user["sub"], "company_created", "company", company["id"], {"name": name})
+    return {"data": company, "message": "Company created"}
+
+
+def merge_companies(user: dict, company_id: str, data: CompanyMergeSchema) -> dict:
+    """Move all content off company_id onto into_id, then delete the duplicate."""
+    if company_id == data.into_id:
+        raise AppError(400, {"error": "Cannot merge a company into itself"})
+
+    loser = maybe_row(supabase.table("companies").select("*").eq("id", company_id))
+    winner = maybe_row(supabase.table("companies").select("*").eq("id", data.into_id))
+    if not loser or not winner:
+        raise AppError(404, {"error": "Company not found"})
+
+    # Only these two tables reference companies.id; applications store a name.
+    moved = {}
+    for table in ("interview_questions", "interview_reviews"):
+        rows = (
+            supabase.table(table)
+            .update({"company_id": data.into_id})
+            .eq("company_id", company_id)
+            .execute()
+        ).data
+        moved[table] = len(rows or [])
+
+    supabase.table("companies").delete().eq("id", company_id).execute()
+
+    _audit(user["sub"], "company_merged", "company", data.into_id,
+           {"merged_from": company_id, "merged_name": loser["name"], **moved})
+    return {"message": f"Merged {loser['name']} into {winner['name']}", "data": moved}
 
 
 def list_flags() -> dict:

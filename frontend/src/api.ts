@@ -57,7 +57,10 @@ export async function api<T = any>(
 
 // --- shared types matching the backend ---
 export interface Domain { id: string; name: string; slug: string }
-export interface Company { id: string; name: string; slug: string; website?: string; industry?: string }
+export interface Company {
+  id: string; name: string; slug: string; website?: string; industry?: string;
+  logo_url?: string; status?: "pending" | "approved";
+}
 export interface User {
   id: string; email: string; role: "user" | "admin" | "super_admin";
   domain_id?: string; skill_level?: string; goal?: string; university?: string;
