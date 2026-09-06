@@ -88,3 +88,11 @@ export interface Application {
   status: "applied" | "interview" | "offer" | "rejected" | "closed";
   applied_date?: string; deadline?: string; job_url?: string; notes?: string;
 }
+export interface CompanyManager {
+  user_id: string; created_at: string; users?: { email: string } | null;
+}
+export interface CompanyEdit {
+  id: string; company_id: string; requested_by: string;
+  changes: Record<string, string>; status: string; created_at: string;
+  companies?: { name: string } | null;
+}

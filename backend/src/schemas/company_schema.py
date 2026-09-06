@@ -26,3 +26,21 @@ class CompanyUpdateSchema(BaseModel):
 
 class CompanyMergeSchema(BaseModel):
     into_id: str
+
+
+class CompanyManagerGrantSchema(BaseModel):
+    email: str
+
+
+class CompanyEditRequestSchema(BaseModel):
+    """What a company manager may propose. Deliberately excludes `status` —
+    managers can never approve their own company or touch its content."""
+    name:     Optional[str] = None
+    website:  Optional[str] = None
+    industry: Optional[str] = None
+    logo_url: Optional[str] = None
+
+
+class CompanyEditDecisionSchema(BaseModel):
+    status:     Literal["approved", "rejected"]
+    admin_note: Optional[str] = None

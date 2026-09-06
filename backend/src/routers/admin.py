@@ -6,6 +6,8 @@ from src.dependencies.auth import require_admin, require_super_admin
 from src.schemas.admin_schema import FlagActionSchema, ModerateSchema, UpdateRoleSchema
 from src.schemas.company_schema import (
     CompanyAdminCreateSchema,
+    CompanyEditDecisionSchema,
+    CompanyManagerGrantSchema,
     CompanyMergeSchema,
     CompanyUpdateSchema,
 )
@@ -128,3 +130,43 @@ def unsuspend_user(
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.unsuspend_user(user, user_id)
+
+
+@router.get("/companies/{company_id}/managers")
+def list_managers(
+    company_id: str,
+    _user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.list_managers(company_id)
+
+
+@router.post("/companies/{company_id}/managers", status_code=201)
+def grant_manager(
+    company_id: str,
+    body: CompanyManagerGrantSchema,
+    user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.grant_manager(user, company_id, body)
+
+
+@router.delete("/companies/{company_id}/managers/{user_id}")
+def revoke_manager(
+    company_id: str,
+    user_id: str,
+    user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.revoke_manager(user, company_id, user_id)
+
+
+@router.get("/company-edits")
+def list_company_edits(_user: Annotated[dict, Depends(require_admin)]) -> dict:
+    return admin_service.list_company_edits()
+
+
+@router.patch("/company-edits/{request_id}")
+def decide_company_edit(
+    request_id: str,
+    body: CompanyEditDecisionSchema,
+    user: Annotated[dict, Depends(require_admin)],
+) -> dict:
+    return admin_service.decide_company_edit(user, request_id, body)

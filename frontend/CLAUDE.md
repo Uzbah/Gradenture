@@ -46,13 +46,16 @@ Login (+ resend verification), Register, ForgotPassword, ResetPassword,
 Onboarding, Dashboard (stats + latest questions + prep score), Questions
 (filters/submit/upvote/flag + inline add-company), Reviews, Applications
 (5-column kanban), Prep (progress ring + topic checklist), Resume (AI
-analyzer), Admin (moderation queue incl. pending companies, flags, user
-management, role-gated).
+analyzer), Companies (registry list + company profile with questions/reviews
+and a manager-only "propose changes" form), Admin (moderation queue incl.
+pending companies and profile edits, flags, companies, user management,
+role-gated).
 
 ## Remaining / known gaps
 
 - **Company select is capped at 50** (`lookups.ts`, `ponytail:` comment) —
-  needs a searchable/paginated dropdown once the companies table grows.
+  the submission forms still use a plain <select>; `/companies` has server-side
+  search (`?q=`) that these could reuse via MUI Autocomplete.
 - **No profile page** (PRD 5.1.3) — can't edit name/avatar/university after
   onboarding; no contribution stats.
 - **No "my submissions" view** — users can't see their pending/rejected/

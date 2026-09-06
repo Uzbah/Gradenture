@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api, Company, Flag, Question, Review, User } from "../api";
+import { FormEvent, useEffect, useState } from "react";
+import { api, Company, CompanyEdit, CompanyManager, Flag, Question, Review, User } from "../api";
 import { useAuth } from "../auth";
 import { useLookups } from "../lookups";
 
@@ -27,13 +27,29 @@ function Queue() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [edits, setEdits] = useState<CompanyEdit[]>([]);
   const [error, setError] = useState("");
 
   const load = () =>
     api<{ data: { questions: Question[]; reviews: Review[]; companies: Company[] } }>("/admin/queue")
       .then((r) => { setQuestions(r.data.questions); setReviews(r.data.reviews); setCompanies(r.data.companies); })
       .catch((e) => setError(e.message));
-  useEffect(() => { load(); }, []);
+
+  const loadEdits = () =>
+    api<{ data: CompanyEdit[] }>("/admin/company-edits")
+      .then((r) => setEdits(r.data))
+      .catch(() => {});
+
+  useEffect(() => { load(); loadEdits(); }, []);
+
+  const decideEdit = async (id: string, status: "approved" | "rejected") => {
+    let admin_note: string | null = null;
+    if (status === "rejected") admin_note = window.prompt("Why is this rejected?") ?? "";
+    try {
+      await api(`/admin/company-edits/${id}`, { method: "PATCH", body: { status, admin_note } });
+      loadEdits();
+    } catch (err: any) { setError(err.message); }
+  };
 
   const approveCompany = async (id: string) => {
     try {
@@ -79,6 +95,28 @@ function Queue() {
           {c.website && <p className="muted">{c.website}</p>}
           <div className="row mt">
             <button className="small" onClick={() => approveCompany(c.id)}>Approve</button>
+          </div>
+        </div>
+      ))}
+
+      <h2 className="mt">Pending profile edits ({edits.length})</h2>
+      {edits.length === 0 && <p className="muted">No profile changes awaiting review.</p>}
+      {edits.map((ed) => (
+        <div className="card" key={ed.id}>
+          <div className="row" style={{ marginBottom: "0.4rem" }}>
+            <strong>{ed.companies?.name ?? "Company"}</strong>
+            <span className="muted">{new Date(ed.created_at).toLocaleDateString()}</span>
+          </div>
+          <table>
+            <tbody>
+              {Object.entries(ed.changes).map(([field, value]) => (
+                <tr key={field}><td>{field}</td><td>{String(value)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="row mt">
+            <button className="small" onClick={() => decideEdit(ed.id, "approved")}>Approve</button>
+            <button className="small danger" onClick={() => decideEdit(ed.id, "rejected")}>Reject</button>
           </div>
         </div>
       ))}
@@ -169,6 +207,7 @@ function CompaniesAdmin() {
   const [editing, setEditing] = useState<Company | null>(null);
   const [creating, setCreating] = useState(false);
   const [merging, setMerging] = useState<Company | null>(null);
+  const [managing, setManaging] = useState<Company | null>(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -255,7 +294,10 @@ function CompaniesAdmin() {
                     )}
                     <button className="small secondary"
                             onClick={() => setMerging(merging?.id === c.id ? null : c)}>Merge</button>
+                    <button className="small secondary"
+                            onClick={() => setManaging(managing?.id === c.id ? null : c)}>Managers</button>
                   </div>
+                  {managing?.id === c.id && <Managers company={c} onError={setError} />}
                   {merging?.id === c.id && (
                     <select defaultValue="" style={{ marginTop: "0.4rem" }}
                             onChange={(e) => e.target.value && merge(c, e.target.value)}>
@@ -277,6 +319,54 @@ function CompaniesAdmin() {
                      onCancel={() => setEditing(null)} />
       )}
     </>
+  );
+}
+
+function Managers({ company, onError }: { company: Company; onError: (m: string) => void }) {
+  const [managers, setManagers] = useState<CompanyManager[]>([]);
+  const [email, setEmail] = useState("");
+
+  const load = () =>
+    api<{ data: CompanyManager[] }>(`/admin/companies/${company.id}/managers`)
+      .then((r) => setManagers(r.data))
+      .catch((e) => onError(e.message));
+  useEffect(() => { load(); }, [company.id]);
+
+  const grant = async (e: FormEvent) => {
+    e.preventDefault();
+    try {
+      await api(`/admin/companies/${company.id}/managers`, { method: "POST", body: { email } });
+      setEmail(""); load();
+    } catch (err: any) { onError(err.message); }
+  };
+
+  const revoke = async (userId: string) => {
+    try {
+      await api(`/admin/companies/${company.id}/managers/${userId}`, { method: "DELETE" });
+      load();
+    } catch (err: any) { onError(err.message); }
+  };
+
+  return (
+    <div className="card mt">
+      <h3>Managers of {company.name}</h3>
+      <p className="muted">
+        Managers may propose profile changes only. They cannot moderate the
+        questions or reviews written about this company.
+      </p>
+      {managers.length === 0 && <p className="muted">No managers assigned.</p>}
+      {managers.map((m) => (
+        <div className="row mt" key={m.user_id} style={{ justifyContent: "space-between" }}>
+          <span>{m.users?.email ?? m.user_id}</span>
+          <button className="small danger" onClick={() => revoke(m.user_id)}>Revoke</button>
+        </div>
+      ))}
+      <form className="row mt" onSubmit={grant}>
+        <input type="email" required placeholder="user@example.com"
+               value={email} onChange={(e) => setEmail(e.target.value)} />
+        <button className="small" type="submit">Grant access</button>
+      </form>
+    </div>
   );
 }
 

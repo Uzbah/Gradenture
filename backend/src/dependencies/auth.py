@@ -117,3 +117,29 @@ def require_super_admin(user: Annotated[dict, Depends(get_current_user)]) -> dic
     if user.get("role") != "super_admin":
         raise HTTPException(status_code=403, detail={"error": "Forbidden"})
     return user
+
+
+def is_company_manager(user_id: str, company_id: str) -> bool:
+    from src.config.supabase import maybe_row, supabase
+    return bool(maybe_row(
+        supabase.table("company_admins")
+        .select("user_id")
+        .eq("company_id", company_id)
+        .eq("user_id", user_id)
+    ))
+
+
+def require_company_manager(
+    company_id: str,
+    user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    """Manager of THIS company, or any platform admin.
+
+    Scope is profile metadata only — never moderation of the questions and
+    reviews written about the company.
+    """
+    if user.get("role") in ("admin", "super_admin"):
+        return user
+    if not is_company_manager(user["sub"], company_id):
+        raise HTTPException(status_code=403, detail={"error": "Forbidden"})
+    return user

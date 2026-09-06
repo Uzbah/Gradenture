@@ -3,6 +3,8 @@ from src.dependencies.exceptions import AppError
 from src.schemas.admin_schema import FlagActionSchema, ModerateSchema, UpdateRoleSchema
 from src.schemas.company_schema import (
     CompanyAdminCreateSchema,
+    CompanyEditDecisionSchema,
+    CompanyManagerGrantSchema,
     CompanyMergeSchema,
     CompanyUpdateSchema,
 )
@@ -290,3 +292,104 @@ def unsuspend_user(actor: dict, user_id: str) -> dict:
 
     _audit(actor["sub"], "user_unsuspended", "user", user_id)
     return {"message": "User unsuspended"}
+
+
+# --- company managers -------------------------------------------------------
+
+def list_managers(company_id: str) -> dict:
+    rows = (
+        supabase.table("company_admins")
+        .select("user_id, created_at, users!company_admins_user_id_fkey(email)")
+        .eq("company_id", company_id)
+        .execute()
+    ).data
+    return {"data": rows}
+
+
+def grant_manager(user: dict, company_id: str, data: CompanyManagerGrantSchema) -> dict:
+    if not maybe_row(supabase.table("companies").select("id").eq("id", company_id)):
+        raise AppError(404, {"error": "Company not found"})
+
+    target = maybe_row(
+        supabase.table("users").select("id, email").ilike("email", data.email.strip())
+    )
+    if not target:
+        raise AppError(404, {"error": "No user with that email"})
+
+    if maybe_row(
+        supabase.table("company_admins")
+        .select("user_id")
+        .eq("company_id", company_id)
+        .eq("user_id", target["id"])
+    ):
+        raise AppError(409, {"error": "Already a manager of this company"})
+
+    supabase.table("company_admins").insert({
+        "company_id": company_id,
+        "user_id":    target["id"],
+        "granted_by": user["sub"],
+    }).execute()
+
+    _audit(user["sub"], "company_manager_granted", "company", company_id,
+           {"user_id": target["id"], "email": target["email"]})
+    return {"message": f"{target['email']} can now manage this company"}
+
+
+def revoke_manager(user: dict, company_id: str, user_id: str) -> dict:
+    result = (
+        supabase.table("company_admins")
+        .delete()
+        .eq("company_id", company_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    if not result.data:
+        raise AppError(404, {"error": "Not a manager of this company"})
+
+    _audit(user["sub"], "company_manager_revoked", "company", company_id,
+           {"user_id": user_id})
+    return {"message": "Manager access revoked"}
+
+
+# --- company profile edit requests ------------------------------------------
+
+def list_company_edits() -> dict:
+    rows = (
+        supabase.table("company_edit_requests")
+        .select("*, companies(name)")
+        .eq("status", "pending")
+        .order("created_at")
+        .execute()
+    ).data
+    return {"data": rows}
+
+
+def decide_company_edit(
+    user: dict, request_id: str, data: CompanyEditDecisionSchema
+) -> dict:
+    req = maybe_row(
+        supabase.table("company_edit_requests")
+        .select("*")
+        .eq("id", request_id)
+        .eq("status", "pending")
+    )
+    if not req:
+        raise AppError(404, {"error": "Pending edit request not found"})
+
+    if data.status == "approved":
+        changes = dict(req["changes"])
+        if "name" in changes:
+            changes["name"] = changes["name"].strip()
+            changes["slug"] = _slug(changes["name"])
+        supabase.table("companies").update(changes).eq("id", req["company_id"]).execute()
+
+    supabase.table("company_edit_requests").update({
+        "status":      data.status,
+        "admin_note":  clean_text(data.admin_note or "") or None,
+        "reviewed_by": user["sub"],
+        "reviewed_at": "now()",
+    }).eq("id", request_id).execute()
+
+    _audit(user["sub"], f"company_edit_{data.status}", "company", req["company_id"],
+           {"request_id": request_id, "changes": req["changes"]})
+    return {"message": f"Edit request {data.status}"}

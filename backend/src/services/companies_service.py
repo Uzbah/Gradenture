@@ -2,7 +2,7 @@ import re
 
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
-from src.schemas.company_schema import CompanySchema
+from src.schemas.company_schema import CompanyEditRequestSchema, CompanySchema
 
 
 def _slug(name: str) -> str:
@@ -61,4 +61,45 @@ def submit_company(data: CompanySchema) -> dict:
         "id":      result.data[0]["id"],
         "status":  "pending",
         "message": "Company submitted for review",
+    }
+
+
+def list_managed(user: dict) -> dict:
+    """Companies this user has been granted management rights over."""
+    rows = (
+        supabase.table("company_admins")
+        .select("companies(*)")
+        .eq("user_id", user["sub"])
+        .execute()
+    ).data
+    return {"data": [r["companies"] for r in rows if r.get("companies")]}
+
+
+def request_edit(user: dict, company_id: str, data: CompanyEditRequestSchema) -> dict:
+    changes = data.model_dump(exclude_none=True)
+    if not changes:
+        raise AppError(400, {"error": "No changes submitted"})
+
+    if not maybe_row(supabase.table("companies").select("id").eq("id", company_id)):
+        raise AppError(404, {"error": "Company not found"})
+
+    existing = maybe_row(
+        supabase.table("company_edit_requests")
+        .select("id")
+        .eq("company_id", company_id)
+        .eq("status", "pending")
+    )
+    if existing:
+        raise AppError(409, {"error": "An edit for this company is already pending review"})
+
+    result = supabase.table("company_edit_requests").insert({
+        "company_id":   company_id,
+        "requested_by": user["sub"],
+        "changes":      changes,
+    }).execute()
+
+    return {
+        "id":      result.data[0]["id"],
+        "status":  "pending",
+        "message": "Changes submitted for review",
     }
