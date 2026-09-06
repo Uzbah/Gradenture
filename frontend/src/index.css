@@ -145,7 +145,7 @@ h3 { font-size: 14px; font-weight: 800; }
 
 /* ---------- forms ---------- */
 label { display: block; font-weight: 800; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--ink); margin: 0.9rem 0 0.4rem; }
-input, select, textarea {
+input:not([class*="Mui"]), select:not([class*="Mui"]), textarea:not([class*="Mui"]) {
   width: 100%;
   padding: 0.65rem 0.85rem;
   border: 1.5px solid var(--border-hair);
@@ -160,16 +160,16 @@ input, select, textarea {
    specificity below wins regardless of DOM order. */
 .card input, .card select, .card textarea { border-color: transparent; }
 .page-narrow .card input, .page-narrow .card select, .page-narrow .card textarea { border-color: var(--border-hair); }
-input::placeholder, textarea::placeholder { color: var(--text-disabled); }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--ink); outline-offset: -1px; }
-textarea { min-height: 90px; resize: vertical; }
+input:not([class*="Mui"])::placeholder, textarea:not([class*="Mui"])::placeholder { color: var(--text-disabled); }
+input:not([class*="Mui"]):focus, select:not([class*="Mui"]):focus, textarea:not([class*="Mui"]):focus { outline: 2px solid var(--ink); outline-offset: -1px; }
+textarea:not([class*="Mui"]) { min-height: 90px; resize: vertical; }
 input[type="checkbox"] { width: auto; accent-color: var(--ink); }
 
 /* ---------- buttons ----------
    Bare button = lime primary (the one action per view). .secondary = white
    outline. .danger = coral outline (destructive, not filled — design.md
    §6 rule 4). .ghost = minimal text action. .small = compact sizing. */
-button {
+button:not([class*="Mui"]) {
   font: inherit;
   font-weight: 800;
   font-size: 13.5px;
@@ -181,8 +181,8 @@ button {
   cursor: pointer;
   transition: background 0.12s ease;
 }
-button:hover { background: var(--lime-hover); }
-button:disabled { opacity: 1; background: #ececec; color: var(--text-disabled); cursor: not-allowed; }
+button:not([class*="Mui"]):hover { background: var(--lime-hover); }
+button:not([class*="Mui"]):disabled { opacity: 1; background: #ececec; color: var(--text-disabled); cursor: not-allowed; }
 
 button.secondary { background: #fff; color: var(--ink); border: 1.5px solid var(--border-strong); font-weight: 700; }
 button.secondary:hover { background: var(--surface); }
@@ -243,9 +243,9 @@ button.small { padding: 0.35rem 0.75rem; font-size: 12px; border-radius: 9px; }
 .tabs button:hover { background: transparent; color: var(--ink); }
 
 /* ---------- tables (admin) ---------- */
-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-alt); }
-th { color: var(--text-muted); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+table:not([class*="Mui"]) { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+th:not([class*="Mui"]), td:not([class*="Mui"]) { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-alt); }
+th:not([class*="Mui"]) { color: var(--text-muted); font-weight: 800; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
 
 /* ---------- stat grid (dashboard) ---------- */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.85rem; margin-bottom: 1rem; }

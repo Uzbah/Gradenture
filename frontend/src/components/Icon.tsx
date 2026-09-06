@@ -8,6 +8,7 @@ const PATHS: Record<string, string> = {
   reviews: "M12 3l2.6 6.6L21 10l-5 4.6L17.4 21 12 17.3 6.6 21 8 14.6 3 10l6.4-.4L12 3Z",
   resume: "M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm8 0v5h5M9 13h6M9 17h6",
   admin: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z",
+  companies: "M4 21V6a1 1 0 0 1 1-1h6v16M11 21h9V10a1 1 0 0 0-1-1h-8M7 9h1M7 13h1M15 13h1M15 17h1",
   logout: "M9 4H5v16h4M14 8l4 4-4 4M18 12H9",
 };
 

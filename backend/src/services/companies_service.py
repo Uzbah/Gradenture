@@ -9,19 +9,20 @@ def _slug(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
 
 
-def list_companies(page: int = 1, limit: int = 20) -> dict:
+def list_companies(page: int = 1, limit: int = 20, q: str | None = None) -> dict:
     page = max(1, page)
     limit = min(50, max(1, limit))
     offset = (page - 1) * limit
 
-    result = (
+    query = (
         supabase.table("companies")
         .select("*", count="exact")
         .eq("status", "approved")
-        .order("name")
-        .range(offset, offset + limit - 1)
-        .execute()
     )
+    if q:
+        query = query.ilike("name", f"%{q}%")
+
+    result = query.order("name").range(offset, offset + limit - 1).execute()
     return {"data": result.data, "count": result.count}
 
 

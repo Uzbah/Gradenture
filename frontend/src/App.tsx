@@ -9,6 +9,8 @@ import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Questions from "./pages/Questions";
 import Reviews from "./pages/Reviews";
+import Companies from "./pages/Companies";
+import CompanyProfile from "./pages/CompanyProfile";
 import Applications from "./pages/Applications";
 import Prep from "./pages/Prep";
 import Resume from "./pages/Resume";
@@ -19,6 +21,7 @@ const NAV_ITEMS = [
   { to: "/prep", end: false, icon: "prep", label: "Prep" },
   { to: "/questions", end: false, icon: "questions", label: "Questions" },
   { to: "/reviews", end: false, icon: "reviews", label: "Reviews" },
+  { to: "/companies", end: false, icon: "companies", label: "Companies" },
   { to: "/applications", end: false, icon: "tracker", label: "Tracker" },
   { to: "/resume", end: false, icon: "resume", label: "Resume AI" },
 ] as const;
@@ -88,6 +91,8 @@ export default function App() {
         <Route path="/prep" element={<Prep />} />
         <Route path="/questions" element={<Questions />} />
         <Route path="/reviews" element={<Reviews />} />
+        <Route path="/companies" element={<Companies />} />
+        <Route path="/companies/:companyId" element={<CompanyProfile />} />
         <Route path="/applications" element={<Applications />} />
         <Route path="/resume" element={<Resume />} />
         <Route path="/admin" element={<Admin />} />

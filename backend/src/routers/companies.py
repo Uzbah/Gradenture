@@ -10,8 +10,8 @@ router = APIRouter(prefix="/companies", tags=["Companies"])
 
 
 @router.get("/")
-def list_companies(page: int = 1, limit: int = 20) -> dict:
-    return companies_service.list_companies(page, limit)
+def list_companies(page: int = 1, limit: int = 20, q: str | None = None) -> dict:
+    return companies_service.list_companies(page, limit, q)
 
 
 @router.get("/{company_id}")
