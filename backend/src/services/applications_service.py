@@ -1,19 +1,16 @@
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.application_schema import ApplicationSchema, ApplicationUpdateSchema
 from src.utils.sanitize import clean_text
 
 
 def _own_or_404(app_id: str, user_id: str) -> dict | None:
-    result = (
+    return maybe_row(
         supabase.table("applications")
         .select("*")
         .eq("id", app_id)
         .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
     )
-    return result.data
 
 
 def list_applications(

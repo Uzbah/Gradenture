@@ -1,4 +1,4 @@
-from src.config.supabase import supabase
+from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.question_schema import FlagSchema
 from src.schemas.review_schema import ReviewSchema
@@ -37,17 +37,15 @@ def list_reviews(
 
 
 def get_review(review_id: str) -> dict:
-    result = (
+    row = maybe_row(
         supabase.table("interview_reviews")
         .select("*")
         .eq("id", review_id)
         .eq("status", "approved")
-        .maybe_single()
-        .execute()
     )
-    if not result.data:
+    if not row:
         raise AppError(404, {"error": "Review not found"})
-    return {"data": _sanitize(result.data)}
+    return {"data": _sanitize(row)}
 
 
 def submit_review(user: dict, data: ReviewSchema) -> dict:

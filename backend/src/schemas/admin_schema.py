@@ -10,3 +10,7 @@ class ModerateSchema(BaseModel):
 
 class UpdateRoleSchema(BaseModel):
     role: Literal["user", "admin", "super_admin"]
+
+
+class FlagActionSchema(BaseModel):
+    status: Literal["resolved", "dismissed"]

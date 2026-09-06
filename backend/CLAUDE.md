@@ -62,13 +62,10 @@ user/role management, rate limiting, JWT verification (HS256 + JWKS).
 - **Admin analytics dashboard** (PRD 5.3.6) — no endpoint for submissions/day,
   approval rates, top contributors.
 - **Timed suspensions** (PRD 5.3.4) — `suspend_user` is a permanent ban
-  (`876600h`); no 1/7/30-day options, no unsuspend endpoint. `warn_user` is a
-  no-op stub (checks the user exists, sends nothing).
-- **Company management** (PRD 5.3.5) — no merge-duplicates, no verified badge;
-  pending companies are not surfaced in `/admin/queue` (approve endpoint exists
-  but nothing lists them).
-- **Flagged content review** (PRD 5.3.3) — flags are inserted into
-  `content_flags` but there is no admin endpoint to list/resolve/dismiss them.
+  (`876600h`); no 1/7/30-day options. Unsuspend exists. `warn_user` records to
+  the audit log but delivers nothing until notifications are wired.
+- **Company management** (PRD 5.3.5) — no merge-duplicates, no verified badge.
+  Pending companies now appear in `/admin/queue`.
 - **Question resubmission** — `needs_edit` status exists and RLS allows the
   submitter to update, but there's no API endpoint to edit + resubmit
   (`QuestionEditSchema` exists unused in `question_schema.py`).
@@ -79,4 +76,5 @@ user/role management, rate limiting, JWT verification (HS256 + JWKS).
 - **Google OAuth** (PRD 5.1.1) — email/password only today.
 - **Phase 2**: AI mock interview (Anthropic API), mentorship, leaderboard,
   curated internship listings, Supabase Realtime queue updates.
-- **Tests** — there are none.
+- **Tests** — no pytest suite. `smoke_admin.py` covers the admin portal
+  end-to-end against a running dev server (`python smoke_admin.py`).

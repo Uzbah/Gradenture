@@ -46,7 +46,8 @@ Login (+ resend verification), Register, ForgotPassword, ResetPassword,
 Onboarding, Dashboard (stats + latest questions + prep score), Questions
 (filters/submit/upvote/flag + inline add-company), Reviews, Applications
 (5-column kanban), Prep (progress ring + topic checklist), Resume (AI
-analyzer), Admin (moderation queue + user management, role-gated).
+analyzer), Admin (moderation queue incl. pending companies, flags, user
+management, role-gated).
 
 ## Remaining / known gaps
 
@@ -57,8 +58,8 @@ analyzer), Admin (moderation queue + user management, role-gated).
 - **No "my submissions" view** — users can't see their pending/rejected/
   needs_edit questions or resubmit after an edit request (backend endpoint
   also missing).
-- **Admin gaps mirror the backend**: no flagged-content section, no pending-
-  companies list, no analytics dashboard, no suspend-duration choice.
+- **Admin gaps mirror the backend**: no analytics dashboard, no suspend-
+  duration choice. (Flags tab, pending-companies approval and unsuspend exist.)
 - **Kanban is dropdown-move, not drag-and-drop** — deliberate; add dnd only
   if users ask.
 - **Flag/moderation notes use `window.prompt`** — fine for MVP, replace with
