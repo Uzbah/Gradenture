@@ -15,3 +15,10 @@ build/
 
 # Supabase local
 .supabase/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# TypeScript incremental build cache
+*.tsbuildinfo
