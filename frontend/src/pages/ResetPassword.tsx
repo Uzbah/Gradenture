@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api";
+import Logo from "../components/Logo";
 
 // Supabase recovery links redirect with #access_token=...&type=recovery
 export default function ResetPassword() {
@@ -28,6 +29,7 @@ export default function ResetPassword() {
   if (!token)
     return (
       <div className="page-narrow">
+        <Logo />
         <div className="card center">
           <h1>Invalid reset link</h1>
           <p className="muted">This link is missing its token. <Link to="/forgot-password">Request a new one</Link>.</p>
@@ -37,6 +39,7 @@ export default function ResetPassword() {
 
   return (
     <div className="page-narrow">
+      <Logo />
       <div className="card">
         <h1>Set a new password</h1>
         <form onSubmit={submit}>

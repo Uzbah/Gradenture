@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { api, Domain } from "../api";
 import { useAuth } from "../auth";
+import Logo from "../components/Logo";
 
 export default function Onboarding() {
   const { user, loading, refresh } = useAuth();
@@ -41,6 +42,7 @@ export default function Onboarding() {
 
   return (
     <div className="page-narrow">
+      <Logo />
       <div className="card">
         <h1>Welcome! Tell us about yourself</h1>
         <form onSubmit={submit}>
