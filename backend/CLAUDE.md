@@ -20,6 +20,27 @@ Conventions: routers never touch the DB directly; all responses are
 `{"data": ...}` or `{"message": ...}`; errors raise `AppError(status, {"error": msg})`;
 user-submitted text goes through `clean_text()` before insert.
 
+## ⚠️ RESTRUCTURE IN PROGRESS
+
+The backend is being reorganised on [fastapi-best-architecture](https://github.com/fastapi-practices/fastapi-best-architecture)
+lines: `api → service → crud`, a unified `{code, msg, data}` response, a settings
+object and an app factory. The new tree is landing alongside the old `src/`, which
+is deleted once every file has a new home.
+
+Already in place — each folder documents its own files:
+
+- `core/` ([CLAUDE.md](core/CLAUDE.md)) — settings, paths, `register_app()`
+- `common/` ([CLAUDE.md](common/CLAUDE.md)) — response, exceptions, security, pagination, enums
+- `database/` ([CLAUDE.md](database/CLAUDE.md)) — supabase and redis clients
+- `middleware/` ([CLAUDE.md](middleware/CLAUDE.md)) — trace id, access log
+- `utils/` ([CLAUDE.md](utils/CLAUDE.md)) — sanitize, limiter, trace id, openapi
+
+Still served by the old `src/` layout until the module migration lands: all routes.
+`main.py` switches to `register_app()` in the same commit that deletes `src/`.
+
+**Standing rule for this backend:** adding, renaming, deleting or repurposing a file
+means updating that folder's `CLAUDE.md` table in the same commit.
+
 ## ⚠️ SETUP REQUIRED (blocking — nothing DB-backed works until done)
 
 The original Supabase project (`bbwoasmiqxuasjokmrpe.supabase.co`) was **deleted**
