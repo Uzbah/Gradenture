@@ -67,6 +67,24 @@ class NotFoundError(BaseExceptionError):
         super().__init__(msg=msg, data=data)
 
 
+class PayloadTooLargeError(BaseExceptionError):
+    """The uploaded body is larger than the endpoint accepts (413)."""
+
+    code = StandardResponseCode.HTTP_413
+
+    def __init__(self, *, msg: str = 'Payload too large', data: Any = None) -> None:
+        super().__init__(msg=msg, data=data)
+
+
+class UnprocessableError(BaseExceptionError):
+    """The request was well-formed but its content could not be used (422)."""
+
+    code = StandardResponseCode.HTTP_422
+
+    def __init__(self, *, msg: str = 'Unprocessable content', data: Any = None) -> None:
+        super().__init__(msg=msg, data=data)
+
+
 class ConflictError(BaseExceptionError):
     """The write conflicts with existing state (409)."""
 

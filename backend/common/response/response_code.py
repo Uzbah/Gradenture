@@ -28,6 +28,7 @@ class CustomResponseCode(CustomCodeBase):
     HTTP_404 = (404, 'Not found')
     HTTP_405 = (405, 'Method not allowed')
     HTTP_409 = (409, 'Conflict')
+    HTTP_413 = (413, 'Payload too large')
     HTTP_422 = (422, 'Validation error')
     HTTP_429 = (429, 'Too many requests')
     HTTP_500 = (500, 'Internal server error')
@@ -71,6 +72,7 @@ class StandardResponseCode:
     HTTP_404 = 404  # NOT_FOUND
     HTTP_405 = 405  # METHOD_NOT_ALLOWED
     HTTP_409 = 409  # CONFLICT
+    HTTP_413 = 413  # CONTENT_TOO_LARGE
     HTTP_422 = 422  # UNPROCESSABLE_ENTITY
     HTTP_429 = 429  # TOO_MANY_REQUESTS
     HTTP_500 = 500  # INTERNAL_SERVER_ERROR
