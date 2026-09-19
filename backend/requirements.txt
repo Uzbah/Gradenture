@@ -42,3 +42,6 @@ loguru==0.7.3
 
 # Shared cache (ban state, JWKS, rate limit storage)
 redis==5.2.1
+
+# Direct Postgres access, used only by backend/scripts/migrate.py
+psycopg[binary]==3.2.3

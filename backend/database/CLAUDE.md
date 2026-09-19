@@ -24,8 +24,14 @@ addresses tables through PostgREST by name (see `backend/common/tables.py`).
   so FastAPI runs them in the threadpool; an `async def` route would block the event
   loop on every PostgREST call.
 - **PostgREST has no client-side transactions.** A write that must be atomic across
-  statements belongs in a Postgres function called with `supabase.rpc(...)` — see
-  `supabase/migrations/*_atomic_rpcs.sql`.
+  statements belongs in a Postgres function called with `supabase.rpc(...)`, not in
+  a sequence of `.update()` calls. The ones that exist are in
+  `supabase/migrations/*_atomic_rpcs.sql`: `toggle_question_upvote`,
+  `moderate_content`, `resolve_content_flag`, `merge_company`, `decide_company_edit`.
+- **Schema changes are raw SQL** in `supabase/migrations/`, applied and tracked by
+  `backend/scripts/migrate.py` (`status` / `up` / `baseline`), which records each
+  file and its checksum in `public.schema_migrations`. Never edit an applied
+  migration — add a new one; the runner refuses to continue when a checksum moves.
 
 ## What lives in Redis
 
