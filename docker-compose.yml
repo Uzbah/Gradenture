@@ -19,10 +19,27 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      NODE_ENV: development
+      ENVIRONMENT: dev
+      REDIS_HOST: redis
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
     volumes:
       # Bind-mount source for hot reload (uvicorn --reload watches these files).
       - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: gradenture-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      # The backend exits at startup if Redis is unreachable, so wait for it.
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   frontend:
     build:
