@@ -59,7 +59,7 @@ def merge_company(
     return response_base.success(res=CustomResponse(code=200, msg=message), data=result)
 
 
-@router.get('/companies/{pk}/managers', summary='List a company\'s managers', dependencies=[DependsAdmin])
+@router.get('/companies/{pk}/managers', summary="List a company's managers", dependencies=[DependsAdmin])
 def get_company_managers(
     pk: Annotated[str, Path(description='Company ID')],
 ) -> ResponseSchemaModel[list[GetManagerDetail]]:

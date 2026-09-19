@@ -10,13 +10,15 @@ from backend.utils.sanitize import clean_text
 
 
 def hide_anonymous(row: dict) -> dict:
-    """Drop the submitter from a row that was submitted anonymously.
+    """Null the submitter on a row that was submitted anonymously.
 
     Applied on the way out rather than at insert time: moderators still need to
-    know who wrote a piece of content, readers do not.
+    know who wrote a piece of content, readers do not. The field is nulled rather
+    than removed because the response schema declares it either way, so removing
+    it here would only have it come back as null from the serializer.
     """
     if row.get('is_anonymous'):
-        row.pop('submitted_by', None)
+        row['submitted_by'] = None
     return row
 
 

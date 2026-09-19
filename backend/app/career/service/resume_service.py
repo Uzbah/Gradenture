@@ -3,7 +3,6 @@ import json
 
 import google.generativeai as genai
 import pdfplumber
-
 from docx import Document
 
 from backend.common.exception import errors
@@ -65,8 +64,7 @@ class ResumeService:
         """The analysis prompt, with the job description folded in when given."""
         jd_block = f'\n\nJob Description:\n{job_description}' if job_description else ''
         jd_field = (
-            '\n- "keyword_gaps": array of important keywords/skills from the job description'
-            ' missing from the resume'
+            '\n- "keyword_gaps": array of important keywords/skills from the job description missing from the resume'
             if job_description
             else '\n- "keyword_gaps": empty array'
         )
@@ -115,7 +113,7 @@ Return only valid JSON with no markdown fences or extra text."""
             raise
         except Exception as exc:
             log.exception('Gemini resume analysis failed: {}', exc)
-            raise errors.GatewayError(msg='AI analysis failed. Please try again.')
+            raise errors.GatewayError(msg='AI analysis failed. Please try again.') from exc
 
 
 resume_service: ResumeService = ResumeService()

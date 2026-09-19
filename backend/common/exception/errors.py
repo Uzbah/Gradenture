@@ -34,7 +34,9 @@ class CustomError(BaseExceptionError):
     The body's ``code`` is the fine-grained code; ``http_code`` is the status sent.
     """
 
-    def __init__(self, *, error: CustomErrorCode, http_code: int = StandardResponseCode.HTTP_400, data: Any = None) -> None:
+    def __init__(
+        self, *, error: CustomErrorCode, http_code: int = StandardResponseCode.HTTP_400, data: Any = None
+    ) -> None:
         self.code = error.code
         self.http_code = http_code
         super().__init__(msg=error.msg, data=data)

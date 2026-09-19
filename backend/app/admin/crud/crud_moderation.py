@@ -10,11 +10,7 @@ class CRUDModeration:
     def get_pending(table: str) -> list[dict]:
         """Everything awaiting review in one table, oldest first."""
         return (
-            supabase.table(table)
-            .select('*')
-            .eq('status', ContentStatus.PENDING)
-            .order('created_at')
-            .execute()
+            supabase.table(table).select('*').eq('status', ContentStatus.PENDING).order('created_at').execute()
         ).data or []
 
     @staticmethod

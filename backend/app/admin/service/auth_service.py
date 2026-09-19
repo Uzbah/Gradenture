@@ -58,7 +58,7 @@ class AuthService:
                 # rather than leave an account that can log in but has no profile.
                 AuthService._rollback_auth_user(user_id)
                 log.exception('public.users insert failed during registration')
-                raise errors.ServerError(msg='Registration failed')
+                raise errors.ServerError(msg='Registration failed') from None
 
             return {
                 'message': 'Registration successful. Please check your email to verify your account.',
@@ -72,9 +72,9 @@ class AuthService:
                 AuthService._rollback_auth_user(user_id)
             message = str(exc).lower()
             if 'already registered' in message or 'already been registered' in message:
-                raise errors.ConflictError(msg='Email already registered')
+                raise errors.ConflictError(msg='Email already registered') from exc
             log.exception('Registration failed')
-            raise errors.ServerError(msg='Registration failed')
+            raise errors.ServerError(msg='Registration failed') from exc
 
     @staticmethod
     def _rollback_auth_user(user_id: str) -> None:
@@ -118,19 +118,19 @@ class AuthService:
         except Exception as exc:
             message = str(exc).lower()
             if 'invalid login' in message or 'invalid credentials' in message:
-                raise errors.TokenError(msg='Invalid email or password')
+                raise errors.TokenError(msg='Invalid email or password') from exc
             if 'email not confirmed' in message:
                 raise errors.CustomError(
                     error=CustomErrorCode.EMAIL_NOT_VERIFIED,
                     http_code=StandardResponseCode.HTTP_403,
-                )
+                ) from exc
             if 'banned' in message or 'user is banned' in message:
                 raise errors.CustomError(
                     error=CustomErrorCode.ACCOUNT_SUSPENDED,
                     http_code=StandardResponseCode.HTTP_403,
-                )
+                ) from exc
             log.exception('Login failed')
-            raise errors.ServerError(msg='Login failed')
+            raise errors.ServerError(msg='Login failed') from exc
 
     @staticmethod
     def logout(*, user: CurrentUser) -> None:
@@ -191,7 +191,7 @@ class AuthService:
             user_dao.set_password(user.sub, obj.password)
         except Exception as exc:
             log.warning('Password reset failed for {}: {}', user.sub, exc)
-            raise errors.RequestError(msg='Password reset failed. Link may be invalid or expired.')
+            raise errors.RequestError(msg='Password reset failed. Link may be invalid or expired.') from exc
 
 
 auth_service: AuthService = AuthService()

@@ -18,7 +18,7 @@ def get_users_paginated(params: DependsPagination) -> ResponseSchemaModel[PageDa
     return response_base.success(data=page)
 
 
-@router.patch('/users/{pk}/role', summary='Change a user\'s role')
+@router.patch('/users/{pk}/role', summary="Change a user's role")
 def update_user_role(
     user: SuperAdminDep,
     pk: Annotated[str, Path(description='User ID')],

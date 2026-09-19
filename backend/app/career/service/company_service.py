@@ -103,9 +103,7 @@ class CompanyService:
                 http_code=StandardResponseCode.HTTP_409,
             )
 
-        request = company_dao.create_edit_request(
-            {'company_id': pk, 'requested_by': user.sub, 'changes': changes}
-        )
+        request = company_dao.create_edit_request({'company_id': pk, 'requested_by': user.sub, 'changes': changes})
         return {
             'id': request['id'],
             'status': 'pending',

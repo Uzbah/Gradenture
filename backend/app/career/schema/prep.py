@@ -6,7 +6,7 @@ from backend.common.schema import SchemaBase
 class ToggleTopicParam(SchemaBase):
     """Mark a roadmap topic done or not done."""
 
-    topic: str = Field(description='Topic name, which must be on the caller\'s roadmap')
+    topic: str = Field(description="Topic name, which must be on the caller's roadmap")
     completed: bool = Field(description='New state')
 
 

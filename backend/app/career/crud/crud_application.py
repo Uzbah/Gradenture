@@ -25,9 +25,7 @@ class CRUDApplication:
 
     @staticmethod
     def get_own(application_id: str, user_id: str) -> dict | None:
-        return maybe_row(
-            supabase.table(APPLICATIONS).select('*').eq('id', application_id).eq('user_id', user_id)
-        )
+        return maybe_row(supabase.table(APPLICATIONS).select('*').eq('id', application_id).eq('user_id', user_id))
 
     @staticmethod
     def create(payload: dict) -> dict:
@@ -36,20 +34,12 @@ class CRUDApplication:
 
     @staticmethod
     def update_own(application_id: str, user_id: str, payload: dict) -> dict | None:
-        result = (
-            supabase.table(APPLICATIONS)
-            .update(payload)
-            .eq('id', application_id)
-            .eq('user_id', user_id)
-            .execute()
-        )
+        result = supabase.table(APPLICATIONS).update(payload).eq('id', application_id).eq('user_id', user_id).execute()
         return result.data[0] if result.data else None
 
     @staticmethod
     def delete_own(application_id: str, user_id: str) -> bool:
-        result = (
-            supabase.table(APPLICATIONS).delete().eq('id', application_id).eq('user_id', user_id).execute()
-        )
+        result = supabase.table(APPLICATIONS).delete().eq('id', application_id).eq('user_id', user_id).execute()
         return bool(result.data)
 
 

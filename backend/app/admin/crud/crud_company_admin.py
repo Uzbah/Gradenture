@@ -59,10 +59,7 @@ class CRUDCompanyAdmin:
     def is_manager(company_id: str, user_id: str) -> bool:
         return bool(
             maybe_row(
-                supabase.table(COMPANY_ADMINS)
-                .select('user_id')
-                .eq('company_id', company_id)
-                .eq('user_id', user_id)
+                supabase.table(COMPANY_ADMINS).select('user_id').eq('company_id', company_id).eq('user_id', user_id)
             )
         )
 
@@ -74,13 +71,7 @@ class CRUDCompanyAdmin:
 
     @staticmethod
     def revoke_manager(company_id: str, user_id: str) -> bool:
-        result = (
-            supabase.table(COMPANY_ADMINS)
-            .delete()
-            .eq('company_id', company_id)
-            .eq('user_id', user_id)
-            .execute()
-        )
+        result = supabase.table(COMPANY_ADMINS).delete().eq('company_id', company_id).eq('user_id', user_id).execute()
         return bool(result.data)
 
     # --- profile edit requests ---

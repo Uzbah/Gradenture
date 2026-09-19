@@ -74,6 +74,9 @@ Run: `pip install -r requirements.txt`, then `python -m backend.run` from the
 repository root (port 3001, auto-reload when `ENVIRONMENT=dev`). Swagger: `/docs`.
 Redis must be reachable — the app exits at startup if it is not.
 
+Check: `pytest backend/tests` (no server or database needed — see
+`tests/CLAUDE.md`), `ruff check backend/`, `ruff format backend/`.
+
 ## ⚠️ SETUP REQUIRED (blocking — nothing DB-backed works until done)
 
 The original Supabase project (`bbwoasmiqxuasjokmrpe.supabase.co`) was **deleted**
@@ -141,6 +144,6 @@ user/role management, rate limiting, JWT verification (HS256 + JWKS).
 - **Google OAuth** (PRD 5.1.1) — email/password only today.
 - **Phase 2**: AI mock interview (Anthropic API), mentorship, leaderboard,
   curated internship listings, Supabase Realtime queue updates.
-- **Tests** — the three `smoke_*.py` scripts (which needed a live server and
-  hardcoded a Windows path) are gone; `tests/` replaces them. See
-  `tests/CLAUDE.md`.
+- **Tests** — `tests/` covers the API surface (103 tests) against an in-memory
+  Supabase. Not covered: token verification itself (the tests override the auth
+  dependency), the Gemini call in `resume_service`, and the Redis-backed caches.

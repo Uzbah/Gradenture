@@ -1,5 +1,4 @@
 import jwt
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.requests import Request

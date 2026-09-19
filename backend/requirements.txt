@@ -45,3 +45,8 @@ redis==5.2.1
 
 # Direct Postgres access, used only by backend/scripts/migrate.py
 psycopg[binary]==3.2.3
+
+# Tests and linting (dev only)
+pytest==8.3.4
+httpx==0.28.1
+ruff==0.8.4

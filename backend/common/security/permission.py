@@ -25,9 +25,7 @@ def require_super_admin(user: Annotated[CurrentUser, Depends(get_current_user)])
 
 def _is_company_manager(user_id: str, company_id: str) -> bool:
     return bool(
-        maybe_row(
-            supabase.table(COMPANY_ADMINS).select('user_id').eq('company_id', company_id).eq('user_id', user_id)
-        )
+        maybe_row(supabase.table(COMPANY_ADMINS).select('user_id').eq('company_id', company_id).eq('user_id', user_id))
     )
 
 

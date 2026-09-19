@@ -44,10 +44,7 @@ class CRUDQuestion:
     def get_approved(question_id: str) -> dict | None:
         """One approved question, or None. Pending and rejected rows stay invisible."""
         return maybe_row(
-            supabase.table(INTERVIEW_QUESTIONS)
-            .select('*')
-            .eq('id', question_id)
-            .eq('status', ContentStatus.APPROVED)
+            supabase.table(INTERVIEW_QUESTIONS).select('*').eq('id', question_id).eq('status', ContentStatus.APPROVED)
         )
 
     @staticmethod

@@ -1,0 +1,35 @@
+# Tooling configuration only. Dependencies stay in requirements.txt, which is what
+# the Dockerfiles install.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".."]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # import sorting
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+]
+ignore = [
+    "E501",   # line length is handled by the formatter
+    "B008",   # Depends(...) in a default argument is how FastAPI works
+    "SIM105", # contextlib.suppress is not clearer than try/except/pass here
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixtures are imported for their side effect of being in scope.
+"tests/*" = ["F811", "F401"]
+
+[tool.ruff.format]
+quote-style = "single"

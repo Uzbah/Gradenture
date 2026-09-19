@@ -1,5 +1,4 @@
 import uuid
-
 from contextvars import ContextVar
 
 from starlette.requests import Request

@@ -39,9 +39,7 @@ class CRUDCompany:
     @staticmethod
     def get_managed_by(user_id: str) -> list[dict]:
         """Companies this user has been granted management rights over."""
-        rows = (
-            supabase.table(COMPANY_ADMINS).select('companies(*)').eq('user_id', user_id).execute()
-        ).data or []
+        rows = (supabase.table(COMPANY_ADMINS).select('companies(*)').eq('user_id', user_id).execute()).data or []
         return [row['companies'] for row in rows if row.get('companies')]
 
     @staticmethod
@@ -52,10 +50,7 @@ class CRUDCompany:
         the approved changes depend on the order an admin happened to click in.
         """
         return maybe_row(
-            supabase.table(COMPANY_EDIT_REQUESTS)
-            .select('id')
-            .eq('company_id', company_id)
-            .eq('status', 'pending')
+            supabase.table(COMPANY_EDIT_REQUESTS).select('id').eq('company_id', company_id).eq('status', 'pending')
         )
 
     @staticmethod

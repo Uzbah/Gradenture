@@ -27,9 +27,7 @@ class CRUDFlag:
 
     @staticmethod
     def get_open() -> list[dict]:
-        return (
-            supabase.table(CONTENT_FLAGS).select('*').eq('status', 'open').order('created_at').execute()
-        ).data or []
+        return (supabase.table(CONTENT_FLAGS).select('*').eq('status', 'open').order('created_at').execute()).data or []
 
     @staticmethod
     def get_flagged_content(content_type: str, content_id: str) -> dict | None:

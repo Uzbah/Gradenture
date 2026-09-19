@@ -64,9 +64,7 @@ class CRUDUser:
         Display only: auth.users stays the source of truth for blocking login, but
         the admin list would otherwise need an auth API call per row.
         """
-        supabase.table(USERS).update({'suspended_at': 'now()' if suspended else None}).eq(
-            'id', user_id
-        ).execute()
+        supabase.table(USERS).update({'suspended_at': 'now()' if suspended else None}).eq('id', user_id).execute()
 
     @staticmethod
     def create_profile(payload: dict) -> None:

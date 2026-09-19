@@ -1,11 +1,9 @@
 import json
-
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 import jwt
 import requests
-
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.algorithms import ECAlgorithm
@@ -137,8 +135,8 @@ def _check_banned(user_id: str) -> bool:
         else:
             expires = banned_until
         if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        return expires > datetime.now(timezone.utc)
+            expires = expires.replace(tzinfo=UTC)
+        return expires > datetime.now(UTC)
     except Exception as exc:
         log.warning('Ban check failed for {}: {}', user_id, exc)
         return False
@@ -160,9 +158,10 @@ def get_current_user(
     try:
         claims = decode_token(token)
     except jwt.ExpiredSignatureError:
-        raise TokenError(msg='Token expired')
+        # Deliberately unchained: the JWT internals are noise to the caller.
+        raise TokenError(msg='Token expired') from None
     except jwt.InvalidTokenError:
-        raise TokenError(msg='Invalid token')
+        raise TokenError(msg='Invalid token') from None
 
     user_id = claims.get('sub')
     if not user_id:

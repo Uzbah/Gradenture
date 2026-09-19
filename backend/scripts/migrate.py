@@ -22,7 +22,6 @@ Requires DATABASE_URL (Supabase: Project Settings -> Database -> connection stri
 import argparse
 import hashlib
 import sys
-
 from pathlib import Path
 
 from backend.core.conf import settings

@@ -25,10 +25,7 @@ class CRUDReview:
     @staticmethod
     def get_approved(review_id: str) -> dict | None:
         return maybe_row(
-            supabase.table(INTERVIEW_REVIEWS)
-            .select('*')
-            .eq('id', review_id)
-            .eq('status', ContentStatus.APPROVED)
+            supabase.table(INTERVIEW_REVIEWS).select('*').eq('id', review_id).eq('status', ContentStatus.APPROVED)
         )
 
     @staticmethod
