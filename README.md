@@ -4,9 +4,13 @@ Interview prep and job application platform for university students and fresh gr
 
 ## Stack
 
-- **Backend:** FastAPI + Python
+- **Backend:** FastAPI + Python, laid out on
+  [fastapi-best-architecture](https://github.com/fastapi-practices/fastapi-best-architecture)
+  lines — `api → service → crud`, a unified `{code, msg, data}` response, an app
+  factory. See [backend/CLAUDE.md](backend/CLAUDE.md).
 - **Frontend:** React 18 + Vite + TypeScript (plain CSS, no UI framework)
-- **Database:** Supabase (Postgres + Auth)
+- **Database:** Supabase (Postgres + Auth), reached through PostgREST — no ORM
+- **Cache:** Redis (ban state, JWKS, rate limits)
 - **AI:** Gemini 2.0 Flash (resume analyzer)
 
 ## ⚠️ Before anything: Supabase setup
@@ -15,8 +19,14 @@ The original Supabase project was deleted, so a new one must be created before
 any DB-backed feature works:
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Run the 3 migrations in `supabase/migrations/` in order (`supabase db push`, or paste into the SQL editor)
-3. Fill in `backend/.env` and `frontend/.env` (keys below)
+2. Fill in `backend/.env` (including `DATABASE_URL`) and `frontend/.env` (keys below)
+3. Apply the migrations from the repo root:
+   ```bash
+   python -m backend.scripts.migrate status   # what this database is missing
+   python -m backend.scripts.migrate up       # apply it
+   ```
+   `supabase db push` also works; follow it with `migrate baseline` so the
+   tracking table matches.
 4. Auth → URL Configuration: add `http://localhost:5173/reset-password` as a redirect URL
 5. Create your first super admin — register through the app, then in the SQL editor:
    ```sql
@@ -26,28 +36,41 @@ any DB-backed feature works:
 ## Backend setup
 
 ```powershell
-cd backend
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
-Copy `.env.example` to `.env` and fill in:
+Copy `backend/.env.example` to `backend/.env` and fill in:
 
 ```
 SUPABASE_URL=                # Project Settings → API
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_JWT_SECRET=         # Project Settings → API → JWT
-SMTP_PASS=                   # Resend API key (optional — emails not wired up yet)
+DATABASE_URL=                # Project Settings → Database (migrations only)
 GEMINI_API_KEY=              # aistudio.google.com (required for resume analyzer)
 ```
 
+Redis has to be running — the app exits at startup if it cannot reach one
+(`docker compose up redis`, or a local `redis-server`).
+
+Run it **from the repository root**, not from `backend/`: `backend` is the
+importable package.
+
 ```powershell
-python main.py
+python -m backend.run
 ```
 
 - API: http://localhost:3001/api/v1
 - Swagger UI: http://localhost:3001/docs
+
+Tests and linting (no server or database needed):
+
+```powershell
+pytest backend/tests
+ruff check backend/
+ruff format backend/
+```
 
 ## Frontend setup
 
@@ -72,7 +95,7 @@ npm run dev    # http://localhost:5173
 
 ```powershell
 cd frontend; npm run build
-cd ..\backend; python main.py   # serves both on :3001
+cd ..; python -m backend.run   # serves both on :3001
 ```
 
 `frontend/dist` is auto-detected — if present, FastAPI serves it at `/`. No CORS needed in prod
@@ -123,18 +146,27 @@ Remaining work and known gaps are tracked in [backend/CLAUDE.md](backend/CLAUDE.
 
 ## Project layout
 
+Every backend folder carries its own `CLAUDE.md` listing the files inside it.
+
 ```
-backend/
-├── main.py                  # FastAPI entry point + static file mount
-├── requirements.txt
-├── CLAUDE.md                # conventions + remaining backend work
-└── src/
-    ├── routers/             # HTTP routes (thin)
-    ├── services/            # Business logic + Supabase queries
-    ├── dependencies/        # Auth (JWT), rate limiting, exceptions
-    ├── schemas/             # Pydantic models
-    ├── config/              # Supabase client
-    └── utils/               # Sanitization
+backend/                     # the importable package — run from the repo root
+├── main.py                  # app = register_app()
+├── run.py                   # python -m backend.run
+├── CLAUDE.md                # layering rules, conventions, remaining work
+├── app/
+│   ├── admin/               # auth, own profile, moderation, admin operations
+│   └── career/              # questions, reviews, companies, applications, prep, resume
+│       ├── api/v1/          # routes — thin, typed, no DB access
+│       ├── service/         # business rules
+│       ├── crud/            # PostgREST queries
+│       └── schema/          # pydantic models
+├── common/                  # response envelope, errors, pagination, security, enums
+├── core/                    # settings, paths, register_app()
+├── database/                # supabase + redis clients
+├── middleware/              # trace id, access log
+├── utils/                   # sanitize, limiter, trace id, openapi
+├── scripts/migrate.py       # migration runner
+└── tests/                   # pytest + httpx, against an in-memory Supabase
 frontend/
 ├── CLAUDE.md                # conventions + remaining frontend work
 ├── src/
@@ -145,10 +177,13 @@ frontend/
 │   ├── index.css            # All styling
 │   └── pages/               # One file per route
 └── .env.production          # VITE_API_BASE_URL=/api/v1 (used on npm run build)
-supabase/migrations/         # SQL migrations (3 files, run in order)
+supabase/migrations/         # SQL migrations (7 files, applied by scripts/migrate.py)
 ```
 
 ## API endpoints
+
+Every response is `{ code, msg, data }`. List endpoints put a page in `data`:
+`{ items, total, page, size, total_pages }`, taking `page` and `size` (max 50).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -180,3 +215,8 @@ supabase/migrations/         # SQL migrations (3 files, run in order)
 | GET | `/api/v1/admin/users` | Admin | List users |
 | PATCH | `/api/v1/admin/users/:id/role` | Super admin | Update role |
 | PATCH | `/api/v1/admin/users/:id/suspend` | Admin | Suspend user |
+| POST | `/api/v1/admin/companies/:id/merge` | Admin | Merge a duplicate company |
+| GET/PATCH | `/api/v1/admin/flags`, `/api/v1/admin/flags/:id` | Admin | List / close content flags |
+| GET/PATCH | `/api/v1/admin/company-edits` | Admin | Manager-proposed profile edits |
+
+The full surface is 51 routes; `/docs` has all of them.

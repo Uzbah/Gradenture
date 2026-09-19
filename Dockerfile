@@ -5,6 +5,9 @@
 #
 # Build from the repo root:  docker build -t gradenture .
 # Run:                       docker run -p 3001:3001 --env-file backend/.env gradenture
+#
+# Redis is not in this image. Point REDIS_HOST at one; the app exits at startup
+# if it cannot reach it.
 
 # --- Stage 1: build the frontend static bundle ---
 FROM node:20-slim AS frontend-build
@@ -20,20 +23,20 @@ RUN npm run build
 # --- Stage 2: backend + the built frontend ---
 FROM python:3.12-slim
 
-WORKDIR /app/backend
+# /app is the import root: `backend` is a package inside it, and
+# core/path_conf.py resolves the frontend to its sibling ../frontend/dist.
+WORKDIR /app
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.txt backend/
+RUN pip install --no-cache-dir -r backend/requirements.txt
 
-COPY backend/ .
+COPY backend/ backend/
 
-# main.py looks for the built frontend at ../frontend/dist relative to
-# itself (/app/backend) — so it must land at /app/frontend/dist.
 COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 
 ENV PYTHONUNBUFFERED=1 \
-    NODE_ENV=production
+    ENVIRONMENT=prod
 
 EXPOSE 3001
 
-CMD ["python", "main.py"]
+CMD ["python", "-m", "backend.run"]

@@ -24,7 +24,8 @@ services:
       RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
     volumes:
       # Bind-mount source for hot reload (uvicorn --reload watches these files).
-      - ./backend:/app
+      # Mounted as /app/backend, not /app: `backend` is the importable package.
+      - ./backend:/app/backend
     depends_on:
       redis:
         condition: service_healthy
