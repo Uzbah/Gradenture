@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Company, CompanyEdit, CompanyManager, Flag, Question, Review, User } from "../api";
+import { api, ApiResponse, Company, CompanyEdit, CompanyManager, Flag, PageData, Question, Review, User } from "../api";
 import { useAuth } from "../auth";
 import { useLookups } from "../lookups";
 
@@ -31,12 +31,12 @@ function Queue() {
   const [error, setError] = useState("");
 
   const load = () =>
-    api<{ data: { questions: Question[]; reviews: Review[]; companies: Company[] } }>("/admin/queue")
+    api<ApiResponse<{ questions: Question[]; reviews: Review[]; companies: Company[] }>>("/admin/queue")
       .then((r) => { setQuestions(r.data.questions); setReviews(r.data.reviews); setCompanies(r.data.companies); })
       .catch((e) => setError(e.message));
 
   const loadEdits = () =>
-    api<{ data: CompanyEdit[] }>("/admin/company-edits")
+    api<ApiResponse<CompanyEdit[]>>("/admin/company-edits")
       .then((r) => setEdits(r.data))
       .catch(() => {});
 
@@ -160,7 +160,7 @@ function Flags() {
   const [error, setError] = useState("");
 
   const load = () =>
-    api<{ data: Flag[] }>("/admin/flags").then((r) => setFlags(r.data)).catch((e) => setError(e.message));
+    api<ApiResponse<Flag[]>>("/admin/flags").then((r) => setFlags(r.data)).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
   const act = async (id: string, status: "resolved" | "dismissed") => {
@@ -212,10 +212,10 @@ function CompaniesAdmin() {
   const [info, setInfo] = useState("");
 
   const load = () => {
-    const params = new URLSearchParams({ limit: "50" });
+    const params = new URLSearchParams({ size: "50" });
     if (q.trim()) params.set("q", q.trim());
-    api<{ data: Company[] }>(`/admin/companies?${params}`)
-      .then((r) => setCompanies(r.data))
+    api<ApiResponse<PageData<Company>>>(`/admin/companies?${params}`)
+      .then((r) => setCompanies(r.data.items))
       .catch((e) => setError(e.message));
   };
   useEffect(() => {
@@ -243,9 +243,9 @@ function CompaniesAdmin() {
     )) return;
     setError(""); setInfo("");
     try {
-      const r = await api<{ message: string }>(`/admin/companies/${from.id}/merge`,
+      const r = await api<ApiResponse<unknown>>(`/admin/companies/${from.id}/merge`,
         { method: "POST", body: { into_id: intoId } });
-      setInfo(r.message);
+      setInfo(r.msg);
       setMerging(null);
       load();
     } catch (err: any) {
@@ -327,7 +327,7 @@ function Managers({ company, onError }: { company: Company; onError: (m: string)
   const [email, setEmail] = useState("");
 
   const load = () =>
-    api<{ data: CompanyManager[] }>(`/admin/companies/${company.id}/managers`)
+    api<ApiResponse<CompanyManager[]>>(`/admin/companies/${company.id}/managers`)
       .then((r) => setManagers(r.data))
       .catch((e) => onError(e.message));
   useEffect(() => { load(); }, [company.id]);
@@ -413,7 +413,8 @@ function Users() {
   const isSuper = me?.role === "super_admin";
 
   const load = () =>
-    api<{ data: User[] }>("/admin/users?limit=50").then((r) => setUsers(r.data)).catch((e) => setError(e.message));
+    api<ApiResponse<PageData<User>>>("/admin/users?size=50")
+      .then((r) => setUsers(r.data.items)).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
   const setRole = async (id: string, role: string) => {

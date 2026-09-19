@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useState } from "react";
-import { api } from "../api";
+import { api, ApiResponse } from "../api";
 
 interface Analysis {
   score: number;
@@ -26,7 +26,7 @@ export default function Resume() {
     fd.append("resume", file);
     if (jd.trim()) fd.append("job_description", jd.trim());
     try {
-      const res = await api<{ data: Analysis }>("/resume/analyze", { method: "POST", body: fd });
+      const res = await api<ApiResponse<Analysis>>("/resume/analyze", { method: "POST", body: fd });
       setResult(res.data);
     } catch (err: any) {
       setError(err.message);

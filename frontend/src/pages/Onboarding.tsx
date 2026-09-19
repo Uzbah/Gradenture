@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { api, Domain } from "../api";
+import { api, ApiResponse, Domain } from "../api";
 import { useAuth } from "../auth";
 import Logo from "../components/Logo";
 
@@ -16,7 +16,7 @@ export default function Onboarding() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api<{ data: Domain[] }>("/domains").then((res) => setDomains(res.data)).catch(() => {});
+    api<ApiResponse<Domain[]>>("/domains").then((res) => setDomains(res.data)).catch(() => {});
   }, []);
 
   if (loading) return <div className="page center muted">Loading…</div>;

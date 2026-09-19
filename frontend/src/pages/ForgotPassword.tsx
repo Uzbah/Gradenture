@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, ApiResponse } from "../api";
 import Logo from "../components/Logo";
 
 export default function ForgotPassword() {
@@ -12,10 +12,10 @@ export default function ForgotPassword() {
     e.preventDefault();
     setError("");
     try {
-      const res = await api<{ message: string }>("/auth/forgot-password", {
+      const res = await api<ApiResponse<null>>("/auth/forgot-password", {
         method: "POST", body: { email },
       });
-      setMessage(res.message);
+      setMessage(res.msg);
     } catch (err: any) {
       setError(err.message);
     }

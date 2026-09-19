@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, Company } from "../api";
+import { api, ApiResponse, Company, PageData } from "../api";
 
 const PER_PAGE = 24;
 
@@ -14,10 +14,10 @@ export default function Companies() {
   useEffect(() => {
     // debounce so typing doesn't fire a request per keystroke
     const t = setTimeout(() => {
-      const params = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
+      const params = new URLSearchParams({ page: String(page), size: String(PER_PAGE) });
       if (q.trim()) params.set("q", q.trim());
-      api<{ data: Company[]; count: number }>(`/companies/?${params}`)
-        .then((r) => { setCompanies(r.data); setCount(r.count); })
+      api<ApiResponse<PageData<Company>>>(`/companies/?${params}`)
+        .then((r) => { setCompanies(r.data.items); setCount(r.data.total); })
         .catch((e) => setError(e.message));
     }, 250);
     return () => clearTimeout(t);

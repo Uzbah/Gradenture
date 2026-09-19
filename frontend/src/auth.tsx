@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { api, getToken, setToken, User } from "./api";
+import { api, ApiResponse, getToken, setToken, User } from "./api";
 
 interface AuthCtx {
   user: User | null;
@@ -17,7 +17,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!!getToken());
 
   const refresh = async () => {
-    const res = await api<{ data: User }>("/users/me");
+    const res = await api<ApiResponse<User>>("/users/me");
     setUser(res.data);
   };
 
@@ -29,11 +29,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await api<{ access_token: string }>("/auth/login", {
+    const res = await api<ApiResponse<{ access_token: string }>>("/auth/login", {
       method: "POST",
       body: { email, password },
     });
-    setToken(res.access_token);
+    setToken(res.data.access_token);
     await refresh();
   };
 

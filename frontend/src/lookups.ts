@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, Company, Domain } from "./api";
+import { api, ApiResponse, Company, Domain, PageData } from "./api";
 
 // ponytail: fetches first 50 companies only; add search/pagination when the list outgrows one dropdown
 export function useLookups() {
@@ -7,10 +7,11 @@ export function useLookups() {
   const [companies, setCompanies] = useState<Company[]>([]);
 
   const reloadCompanies = () =>
-    api<{ data: Company[] }>("/companies/?limit=50").then((r) => setCompanies(r.data)).catch(() => {});
+    api<ApiResponse<PageData<Company>>>("/companies/?size=50")
+      .then((r) => setCompanies(r.data.items)).catch(() => {});
 
   useEffect(() => {
-    api<{ data: Domain[] }>("/domains").then((r) => setDomains(r.data)).catch(() => {});
+    api<ApiResponse<Domain[]>>("/domains").then((r) => setDomains(r.data)).catch(() => {});
     reloadCompanies();
   }, []);
 

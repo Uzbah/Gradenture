@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Application } from "../api";
+import { api, ApiResponse, Application, PageData } from "../api";
 
 const COLUMNS: { key: Application["status"]; label: string }[] = [
   { key: "applied", label: "Applied" },
@@ -15,7 +15,8 @@ export default function Applications() {
   const [error, setError] = useState("");
 
   const load = () =>
-    api<{ data: Application[] }>("/applications/?limit=50").then((r) => setApps(r.data)).catch(() => {});
+    api<ApiResponse<PageData<Application>>>("/applications/?size=50")
+      .then((r) => setApps(r.data.items)).catch(() => {});
   useEffect(() => { load(); }, []);
 
   const move = async (app: Application, status: Application["status"]) => {

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Question } from "../api";
+import { api, ApiResponse, PageData, Question } from "../api";
 import { useLookups } from "../lookups";
 
 export default function Questions() {
@@ -12,18 +12,19 @@ export default function Questions() {
   const [message, setMessage] = useState("");
 
   const load = () => {
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
+    const params = new URLSearchParams({ page: String(page), size: "20" });
     Object.entries(filters).forEach(([k, v]) => v && params.set(k, v));
-    api<{ data: Question[]; count: number }>(`/questions/?${params}`)
-      .then((r) => { setQuestions(r.data); setCount(r.count); })
+    api<ApiResponse<PageData<Question>>>(`/questions/?${params}`)
+      .then((r) => { setQuestions(r.data.items); setCount(r.data.total); })
       .catch(() => {});
   };
   useEffect(load, [page, filters]);
 
   const upvote = async (id: string) => {
     try {
-      const res = await api<{ upvotes: number }>(`/questions/${id}/upvote`, { method: "POST" });
-      setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, upvotes: res.upvotes } : q)));
+      const res = await api<ApiResponse<{ upvoted: boolean; upvotes: number }>>(
+        `/questions/${id}/upvote`, { method: "POST" });
+      setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, upvotes: res.data.upvotes } : q)));
     } catch (err: any) {
       setMessage(err.message);
     }

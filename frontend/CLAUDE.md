@@ -23,6 +23,15 @@ Conventions: token in localStorage; month fields use `<input type="month">`
 and send `YYYY-MM-01`; API errors are shown via `err.message` (already
 flattened by `api.ts`); optimistic updates then reconcile from the response.
 
+**Response envelope.** Every backend response is `{ code, msg, data }`
+(`ApiResponse<T>` in `api.ts`). `api()` returns the whole envelope, so read the
+payload as `res.data` and a confirmation message as `res.msg`. List endpoints put
+a page in `data`: `PageData<T>` = `{ items, total, page, size, total_pages }` —
+so `res.data.items` and `res.data.total`, not `res.data` and `res.count`. Their
+query parameters are `page` and `size` (`size` maxes out at 50). Errors carry the
+reason in `msg`, and validation failures put `{ field: [message, ...] }` in
+`data`; `extractError()` in `api.ts` flattens both.
+
 Run: `npm install`, `npm run dev` (5173). Build: `npm run build`
 (`tsc -b && vite build`) — output `dist/` is served by the backend in prod
 (`.env.production` sets `VITE_API_BASE_URL=/api/v1`).

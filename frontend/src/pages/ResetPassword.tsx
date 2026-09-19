@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../api";
+import { api, ApiResponse } from "../api";
 import Logo from "../components/Logo";
 
 // Supabase recovery links redirect with #access_token=...&type=recovery
@@ -17,10 +17,10 @@ export default function ResetPassword() {
     e.preventDefault();
     setError("");
     try {
-      const res = await api<{ message: string }>("/auth/reset-password", {
+      const res = await api<ApiResponse<null>>("/auth/reset-password", {
         method: "POST", body: { password }, token,
       });
-      setMessage(res.message);
+      setMessage(res.msg);
     } catch (err: any) {
       setError(err.message);
     }

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Review } from "../api";
+import { api, ApiResponse, PageData, Review } from "../api";
 import { useLookups } from "../lookups";
 
 export default function Reviews() {
@@ -12,10 +12,10 @@ export default function Reviews() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
+    const params = new URLSearchParams({ page: String(page), size: "20" });
     Object.entries(filters).forEach(([k, v]) => v && params.set(k, v));
-    api<{ data: Review[]; count: number }>(`/reviews/?${params}`)
-      .then((r) => { setReviews(r.data); setCount(r.count); })
+    api<ApiResponse<PageData<Review>>>(`/reviews/?${params}`)
+      .then((r) => { setReviews(r.data.items); setCount(r.data.total); })
       .catch(() => {});
   }, [page, filters]);
 

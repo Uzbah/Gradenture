@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, Company, Question, Review } from "../api";
+import { api, ApiResponse, Company, PageData, Question, Review } from "../api";
 import { useLookups } from "../lookups";
 
 export default function CompanyProfile() {
@@ -17,14 +17,14 @@ export default function CompanyProfile() {
 
   useEffect(() => {
     if (!companyId) return;
-    api<{ data: Company }>(`/companies/${companyId}`)
+    api<ApiResponse<Company>>(`/companies/${companyId}`)
       .then((r) => setCompany(r.data))
       .catch((e) => setError(e.message));
-    api<{ data: Question[] }>(`/questions/?company_id=${companyId}&limit=50`)
-      .then((r) => setQuestions(r.data)).catch(() => {});
-    api<{ data: Review[] }>(`/reviews/?company_id=${companyId}&limit=50`)
-      .then((r) => setReviews(r.data)).catch(() => {});
-    api<{ data: Company[] }>("/companies/managed")
+    api<ApiResponse<PageData<Question>>>(`/questions/?company_id=${companyId}&size=50`)
+      .then((r) => setQuestions(r.data.items)).catch(() => {});
+    api<ApiResponse<PageData<Review>>>(`/reviews/?company_id=${companyId}&size=50`)
+      .then((r) => setReviews(r.data.items)).catch(() => {});
+    api<ApiResponse<Company[]>>("/companies/managed")
       .then((r) => setCanManage(r.data.some((c) => c.id === companyId)))
       .catch(() => {});
   }, [companyId]);

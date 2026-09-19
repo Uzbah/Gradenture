@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, Application, Question } from "../api";
+import { api, ApiResponse, Application, PageData, Question } from "../api";
 import { useAuth } from "../auth";
 
 export default function Dashboard() {
@@ -11,11 +11,12 @@ export default function Dashboard() {
   const [prepScore, setPrepScore] = useState<number | null>(null);
 
   useEffect(() => {
-    api<{ data: Application[] }>("/applications/?limit=50").then((r) => setApps(r.data)).catch(() => {});
-    api<{ data: Question[]; count: number }>("/questions/?limit=5")
-      .then((r) => { setRecent(r.data); setQuestionCount(r.count); })
+    api<ApiResponse<PageData<Application>>>("/applications/?size=50")
+      .then((r) => setApps(r.data.items)).catch(() => {});
+    api<ApiResponse<PageData<Question>>>("/questions/?size=5")
+      .then((r) => { setRecent(r.data.items); setQuestionCount(r.data.total); })
       .catch(() => {});
-    api<{ data: { score: number } }>("/prep/").then((r) => setPrepScore(r.data.score)).catch(() => {});
+    api<ApiResponse<{ score: number }>>("/prep/").then((r) => setPrepScore(r.data.score)).catch(() => {});
   }, []);
 
   const count = (s: string) => apps.filter((a) => a.status === s).length;

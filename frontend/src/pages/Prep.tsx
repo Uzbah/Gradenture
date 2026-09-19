@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, ApiResponse } from "../api";
 
 interface PrepData {
   topics: { topic: string; completed: boolean }[];
@@ -33,7 +33,7 @@ export default function Prep() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api<{ data: PrepData }>("/prep/").then((r) => setData(r.data)).catch((e) => setError(e.message));
+    api<ApiResponse<PrepData>>("/prep/").then((r) => setData(r.data)).catch((e) => setError(e.message));
   }, []);
 
   const toggle = async (topic: string, completed: boolean) => {
@@ -43,7 +43,7 @@ export default function Prep() {
       topics: d.topics.map((t) => (t.topic === topic ? { ...t, completed } : t)),
     });
     try {
-      const res = await api<{ data: PrepData }>("/prep/", {
+      const res = await api<ApiResponse<PrepData>>("/prep/", {
         method: "PATCH", body: { topic, completed },
       });
       setData(res.data);

@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth";
-import { api } from "../api";
+import { api, ApiResponse } from "../api";
 import Logo from "../components/Logo";
 
 export default function Login() {
@@ -28,10 +28,10 @@ export default function Login() {
 
   const resend = async () => {
     setError("");
-    const res = await api<{ message: string }>("/auth/resend-verification", {
+    const res = await api<ApiResponse<null>>("/auth/resend-verification", {
       method: "POST", body: { email },
     });
-    setInfo(res.message);
+    setInfo(res.msg);
   };
 
   return (

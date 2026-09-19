@@ -18,12 +18,18 @@ export class ApiError extends Error {
 }
 
 function extractError(body: any): string {
-  if (body?.error) return body.error;
-  if (body?.errors) {
-    return Object.entries(body.errors as Record<string, string[]>)
-      .map(([field, msgs]) => `${field}: ${msgs.join(", ")}`)
-      .join("; ");
+  // Validation failures put {field: [message, ...]} in `data`; everything else
+  // says what went wrong in `msg`.
+  if (body?.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+    const entries = Object.entries(body.data as Record<string, unknown>);
+    const fields = entries.filter(([, v]) => Array.isArray(v));
+    if (fields.length) {
+      return fields
+        .map(([field, msgs]) => `${field}: ${(msgs as string[]).join(", ")}`)
+        .join("; ");
+    }
   }
+  if (body?.msg) return body.msg;
   return "Request failed";
 }
 
@@ -56,6 +62,23 @@ export async function api<T = any>(
 }
 
 // --- shared types matching the backend ---
+
+/** Every endpoint answers with this envelope, success or failure. */
+export interface ApiResponse<T = unknown> {
+  code: number;
+  msg: string;
+  data: T;
+}
+
+/** The `data` of any list endpoint. */
+export interface PageData<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
+  total_pages: number;
+}
+
 export interface Domain { id: string; name: string; slug: string }
 export interface Company {
   id: string; name: string; slug: string; website?: string; industry?: string;
