@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -15,7 +16,9 @@ from src.dependencies.exceptions import AppError
 from src.dependencies.rate_limit import limiter
 from src.routers import api_router
 
-load_dotenv()
+# Explicit path: load_dotenv() alone resolves from the CWD, so starting the
+# server from another directory silently loads the wrong .env (or none).
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 logger = logging.getLogger(__name__)
 

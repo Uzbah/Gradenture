@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
+
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
-load_dotenv()
+# Anchored to backend/.env rather than the CWD (see main.py).
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 
 def _init() -> Client:
