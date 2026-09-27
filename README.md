@@ -15,7 +15,7 @@ The original Supabase project was deleted, so a new one must be created before
 any DB-backed feature works:
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Run the 3 migrations in `supabase/migrations/` in order (`supabase db push`, or paste into the SQL editor)
+2. Run all migrations in `supabase/migrations/` in filename order (`supabase db push`, or paste into the SQL editor)
 3. Fill in `backend/.env` and `frontend/.env` (keys below)
 4. Auth → URL Configuration: add `http://localhost:5173/reset-password` as a redirect URL
 5. Create your first super admin — register through the app, then in the SQL editor:
@@ -145,7 +145,7 @@ frontend/
 │   ├── index.css            # All styling
 │   └── pages/               # One file per route
 └── .env.production          # VITE_API_BASE_URL=/api/v1 (used on npm run build)
-supabase/migrations/         # SQL migrations (3 files, run in order)
+supabase/migrations/         # SQL migrations (run in filename order)
 ```
 
 ## API endpoints
