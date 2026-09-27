@@ -78,6 +78,26 @@ TOPICS: dict[str, list[str]] = {
         "Industry Awareness",
         "Behavioural / STAR Method",
     ],
+    "ui-ux-design": [
+        "UI vs UX Fundamentals",
+        "User Research & Problem Discovery",
+        "Wireframes, Mockups & Prototypes",
+        "Figma (Auto Layout, Components, Libraries)",
+        "Design Systems & Consistency",
+        "Mobile & Responsive UX",
+        "Portfolio & Case Studies",
+        "Behavioural / STAR Method",
+    ],
+    "quality-assurance": [
+        "SDLC & STLC",
+        "Test Cases & Test Scenarios",
+        "Manual & Exploratory Testing",
+        "Bug Reporting (Priority vs Severity)",
+        "API Testing (Postman)",
+        "Test Automation (Cypress, POM)",
+        "Performance Testing (JMeter)",
+        "Behavioural / STAR Method",
+    ],
 }
 
 
@@ -128,3 +148,41 @@ def toggle_topic(user: dict, topic: str, completed: bool) -> dict:
     ).execute()
 
     return get_prep(user)
+
+
+def list_bank_questions(
+    page: int = 1,
+    limit: int = 20,
+    domain_id: str | None = None,
+    company_id: str | None = None,
+    role_title: str | None = None,
+    q: str | None = None,
+    question_type: str | None = None,
+    difficulty: str | None = None,
+) -> dict:
+    """Curated question_bank — separate from community interview_questions."""
+    page = max(1, page)
+    limit = min(50, max(1, limit))
+    offset = (page - 1) * limit
+
+    query = supabase.table("question_bank").select(
+        "id, domain_id, company_id, role_title, question_text, question_type, difficulty",
+        count="exact",
+    )
+    for field, val in (
+        ("domain_id", domain_id),
+        ("company_id", company_id),
+        ("role_title", role_title),
+        ("question_type", question_type),
+        ("difficulty", difficulty),
+    ):
+        if val:
+            query = query.eq(field, val)
+
+    query = query.order("role_title").order("question_text").range(offset, offset + limit - 1)
+    # text_search returns a builder with no .order/.range, so it must come last
+    if q:
+        query = query.text_search("search", q, options={"type": "web_search", "config": "english"})
+
+    result = query.execute()
+    return {"data": result.data, "count": result.count}

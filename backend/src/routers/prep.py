@@ -25,3 +25,19 @@ def toggle_topic(
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return prep_service.toggle_topic(user, body.topic, body.completed)
+
+
+@router.get("/questions")
+def list_bank_questions(
+    page: int = 1,
+    limit: int = 20,
+    domain_id: str | None = None,
+    company_id: str | None = None,
+    role_title: str | None = None,
+    q: str | None = None,
+    question_type: str | None = None,
+    difficulty: str | None = None,
+) -> dict:
+    return prep_service.list_bank_questions(
+        page, limit, domain_id, company_id, role_title, q, question_type, difficulty
+    )

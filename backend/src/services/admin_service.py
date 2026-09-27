@@ -19,7 +19,7 @@ def _audit(
     actor_id: str,
     action: str,
     target_type: str,
-    target_id: str,
+    target_id: str | None,
     detail: dict | None = None,
 ) -> None:
     """Every admin mutation records here. Failures surface loudly, by design."""
@@ -172,9 +172,11 @@ def merge_companies(user: dict, company_id: str, data: CompanyMergeSchema) -> di
     if not loser or not winner:
         raise AppError(404, {"error": "Company not found"})
 
-    # Only these two tables reference companies.id; applications store a name.
+    # Only these tables reference companies.id; applications store a name.
+    # ponytail: a question_bank row already on the survivor with the same text
+    # makes the move hit question_bank_unique (500); dedupe first if that happens.
     moved = {}
-    for table in ("interview_questions", "interview_reviews"):
+    for table in ("interview_questions", "interview_reviews", "question_bank"):
         rows = (
             supabase.table(table)
             .update({"company_id": data.into_id})

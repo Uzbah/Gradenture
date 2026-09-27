@@ -1,5 +1,7 @@
 # CareerBridge Backend — CLAUDE.md
 
+> **Keep this file current.** If you add, remove, rename, or materially change any file in this folder (or its subfolder layout), update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
+
 FastAPI + Supabase (Postgres) backend. Entry point `main.py`, serves the API at
 `/api/v1` and the built frontend (`../frontend/dist`) at `/` when it exists.
 
@@ -14,6 +16,9 @@ src/
 ├── dependencies/       # auth.py (JWT), rate_limit.py, exceptions.py
 ├── config/supabase.py  # Supabase client (service role key)
 └── utils/sanitize.py   # bleach wrapper
+scripts/
+├── ingest_questions.py # CSV → question_bank importer (dry run by default; --commit --actor <admin email>)
+└── data/               # reviewed import CSVs; file stem = `source` tag (undo: DELETE ... WHERE source = stem)
 ```
 
 Conventions: routers never touch the DB directly; all responses are
@@ -28,11 +33,14 @@ The original Supabase project (`bbwoasmiqxuasjokmrpe.supabase.co`) was **deleted
 1. Create a new project at supabase.com
 2. Update `.env`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`
    (Project Settings → API / JWT)
-3. Run all 3 migrations in `../supabase/migrations/` in order
+3. Run all migrations in `../supabase/migrations/` in filename order
    (`supabase db push` or paste into the SQL editor):
    - `..._initial_schema.sql` — domains, users, RLS
    - `..._remaining_tables.sql` — companies, questions, reviews, upvotes, flags, applications, prep_progress
    - `..._upvote_functions.sql` — `increment_upvotes` / `decrement_upvotes` RPCs
+   - `..._admin_audit_log.sql` — audit log + `users.suspended_at`
+   - `..._company_admins.sql` — company managers + profile edit requests
+   - `..._question_bank.sql` — curated `question_bank` + UI/UX and QA domains
 4. Supabase Auth → URL Configuration: add `http://localhost:5173/reset-password`
    as a redirect URL (password recovery)
 5. Optional keys in `.env`:
@@ -51,7 +59,8 @@ auto-reload when `NODE_ENV=development`). Swagger: `/docs`.
 Auth (register/login/logout/forgot/reset, email verification), onboarding,
 questions (submit/list/filter/upvote/flag), reviews, companies (user-submitted,
 admin-approved), applications tracker, prep roadmaps + preparedness score
-(`/prep`), AI resume analyzer (Gemini 2.0 Flash), admin moderation queue,
+(`/prep`), curated question bank (`GET /prep/questions`, filters +
+full-text `q`; filled by `scripts/ingest_questions.py`), AI resume analyzer (Gemini 2.0 Flash), admin moderation queue,
 user/role management, rate limiting, JWT verification (HS256 + JWKS).
 
 ## Remaining (PRD features not yet built)
