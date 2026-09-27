@@ -1,24 +1,45 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Question } from "../api";
+import { api, BankQuestion, Question } from "../api";
 import { useLookups } from "../lookups";
+
+const PER_PAGE = 20;
 
 export default function Questions() {
   const { domains, companies, domainName, companyName, reloadCompanies } = useLookups();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
+  const [bank, setBank] = useState<BankQuestion[]>([]);
+  const [bankCount, setBankCount] = useState(0);
+  const [bankPage, setBankPage] = useState(1);
   const [filters, setFilters] = useState({ domain_id: "", company_id: "", difficulty: "", question_type: "" });
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
 
-  const load = () => {
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
+  const query = (p: number) => {
+    const params = new URLSearchParams({ page: String(p), limit: String(PER_PAGE) });
     Object.entries(filters).forEach(([k, v]) => v && params.set(k, v));
-    api<{ data: Question[]; count: number }>(`/questions/?${params}`)
+    return params;
+  };
+
+  // community submissions (approved only)
+  useEffect(() => {
+    api<{ data: Question[]; count: number }>(`/questions/?${query(page)}`)
       .then((r) => { setQuestions(r.data); setCount(r.count); })
       .catch(() => {});
+  }, [page, filters]);
+
+  // curated question_bank, same filters
+  useEffect(() => {
+    api<{ data: BankQuestion[]; count: number }>(`/prep/questions?${query(bankPage)}`)
+      .then((r) => { setBank(r.data); setBankCount(r.count); })
+      .catch(() => {});
+  }, [bankPage, filters]);
+
+  const setFilter = (k: keyof typeof filters, v: string) => {
+    setPage(1); setBankPage(1);
+    setFilters((f) => ({ ...f, [k]: v }));
   };
-  useEffect(load, [page, filters]);
 
   const upvote = async (id: string) => {
     try {
@@ -58,21 +79,21 @@ export default function Questions() {
       {message && <p className="success">{message}</p>}
 
       <div className="filters">
-        <select value={filters.domain_id} onChange={(e) => { setPage(1); setFilters({ ...filters, domain_id: e.target.value }); }}>
+        <select value={filters.domain_id} onChange={(e) => setFilter("domain_id", e.target.value)}>
           <option value="">All domains</option>
           {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <select value={filters.company_id} onChange={(e) => { setPage(1); setFilters({ ...filters, company_id: e.target.value }); }}>
+        <select value={filters.company_id} onChange={(e) => setFilter("company_id", e.target.value)}>
           <option value="">All companies</option>
           {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select value={filters.difficulty} onChange={(e) => { setPage(1); setFilters({ ...filters, difficulty: e.target.value }); }}>
+        <select value={filters.difficulty} onChange={(e) => setFilter("difficulty", e.target.value)}>
           <option value="">Any difficulty</option>
           <option value="easy">Easy</option>
           <option value="medium">Medium</option>
           <option value="hard">Hard</option>
         </select>
-        <select value={filters.question_type} onChange={(e) => { setPage(1); setFilters({ ...filters, question_type: e.target.value }); }}>
+        <select value={filters.question_type} onChange={(e) => setFilter("question_type", e.target.value)}>
           <option value="">Any type</option>
           <option value="technical">Technical</option>
           <option value="behavioural">Behavioural</option>
@@ -81,7 +102,8 @@ export default function Questions() {
         </select>
       </div>
 
-      {questions.length === 0 && <p className="muted">No questions match these filters yet.</p>}
+      <h2>Community submissions ({count})</h2>
+      {questions.length === 0 && <p className="muted">No community questions match these filters yet.</p>}
       {questions.map((q) => (
         <div className="card" key={q.id}>
           <div className="row" style={{ marginBottom: "0.4rem" }}>
@@ -99,15 +121,36 @@ export default function Questions() {
           </div>
         </div>
       ))}
+      <Pager page={page} count={count} onPage={setPage} />
 
-      {count > 20 && (
-        <div className="row">
-          <button className="secondary small" disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-          <span className="muted">Page {page} of {Math.ceil(count / 20)}</span>
-          <button className="secondary small" disabled={page >= Math.ceil(count / 20)} onClick={() => setPage(page + 1)}>Next</button>
+      <h2 className="mt">From the interview question pool ({bankCount})</h2>
+      {bank.length === 0 && <p className="muted">No pool questions match these filters.</p>}
+      {bank.map((q) => (
+        <div className="card" key={q.id}>
+          <div className="row" style={{ marginBottom: "0.4rem" }}>
+            <span className="badge">{domainName(q.domain_id)}</span>
+            {q.company_id && <span className="badge">{companyName(q.company_id)}</span>}
+            {q.difficulty && <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>}
+            <span className="badge">{q.question_type.replace("_", " ")}</span>
+            <span className="muted">{q.role_title}</span>
+          </div>
+          <p>{q.question_text}</p>
         </div>
-      )}
+      ))}
+      <Pager page={bankPage} count={bankCount} onPage={setBankPage} />
     </>
+  );
+}
+
+function Pager({ page, count, onPage }: { page: number; count: number; onPage: (p: number) => void }) {
+  const pages = Math.ceil(count / PER_PAGE);
+  if (pages <= 1) return null;
+  return (
+    <div className="row">
+      <button className="secondary small" disabled={page === 1} onClick={() => onPage(page - 1)}>Prev</button>
+      <span className="muted">Page {page} of {pages}</span>
+      <button className="secondary small" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
+    </div>
   );
 }
 

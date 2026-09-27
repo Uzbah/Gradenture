@@ -77,6 +77,10 @@ export interface Question {
   asked_date: string; notes?: string; upvotes: number; status: string;
   created_at: string; submitted_by?: string; admin_note?: string;
 }
+export interface BankQuestion {
+  id: string; domain_id: string; company_id?: string | null; role_title: string;
+  question_text: string; question_type: string; difficulty?: string | null;
+}
 export interface Review {
   id: string; company_id: string; domain_id?: string; role_title: string;
   review_text: string; interview_date: string; difficulty?: string;

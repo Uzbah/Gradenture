@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, Company, Question, Review } from "../api";
+import { api, BankQuestion, Company, Question, Review } from "../api";
 import { useLookups } from "../lookups";
 
 export default function CompanyProfile() {
@@ -8,6 +8,7 @@ export default function CompanyProfile() {
   const { domainName } = useLookups();
   const [company, setCompany] = useState<Company | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [bank, setBank] = useState<BankQuestion[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [tab, setTab] = useState<"questions" | "reviews">("questions");
   const [canManage, setCanManage] = useState(false);
@@ -22,6 +23,8 @@ export default function CompanyProfile() {
       .catch((e) => setError(e.message));
     api<{ data: Question[] }>(`/questions/?company_id=${companyId}&limit=50`)
       .then((r) => setQuestions(r.data)).catch(() => {});
+    api<{ data: BankQuestion[] }>(`/prep/questions?company_id=${companyId}&limit=50`)
+      .then((r) => setBank(r.data)).catch(() => {});
     api<{ data: Review[] }>(`/reviews/?company_id=${companyId}&limit=50`)
       .then((r) => setReviews(r.data)).catch(() => {});
     api<{ data: Company[] }>("/companies/managed")
@@ -34,6 +37,8 @@ export default function CompanyProfile() {
 
   const offers = reviews.filter((r) => r.outcome === "offer").length;
   const withOutcome = reviews.filter((r) => r.outcome && r.outcome !== "pending").length;
+  // community (approved) + curated question_bank, rendered the same way
+  const allQuestions: (Question | BankQuestion)[] = [...questions, ...bank];
 
   return (
     <>
@@ -66,7 +71,7 @@ export default function CompanyProfile() {
       )}
 
       <div className="stat-grid mt">
-        <div className="stat"><strong>{questions.length}</strong><span className="muted">Questions</span></div>
+        <div className="stat"><strong>{allQuestions.length}</strong><span className="muted">Questions</span></div>
         <div className="stat"><strong>{reviews.length}</strong><span className="muted">Reviews</span></div>
         <div className="stat">
           <strong>{withOutcome ? `${Math.round((offers / withOutcome) * 100)}%` : "—"}</strong>
@@ -76,7 +81,7 @@ export default function CompanyProfile() {
 
       <div className="tabs mt">
         <button className={tab === "questions" ? "active" : ""} onClick={() => setTab("questions")}>
-          Questions ({questions.length})
+          Questions ({allQuestions.length})
         </button>
         <button className={tab === "reviews" ? "active" : ""} onClick={() => setTab("reviews")}>
           Reviews ({reviews.length})
@@ -84,14 +89,14 @@ export default function CompanyProfile() {
       </div>
 
       {tab === "questions" ? (
-        questions.length === 0 ? (
+        allQuestions.length === 0 ? (
           <p className="muted">No approved questions for {company.name} yet.</p>
         ) : (
-          questions.map((q) => (
+          allQuestions.map((q) => (
             <div className="card" key={q.id}>
               <div className="row" style={{ marginBottom: "0.4rem" }}>
                 <span className="badge">{domainName(q.domain_id)}</span>
-                <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>
+                {q.difficulty && <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>}
                 <span className="muted">{q.role_title}</span>
               </div>
               <p>{q.question_text}</p>

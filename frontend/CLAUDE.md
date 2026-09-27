@@ -1,5 +1,7 @@
 # CareerBridge Frontend — CLAUDE.md
 
+> **Keep this file current.** If you add, remove, rename, or materially change any file in this folder (or its subfolder layout), update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
+
 React 18 + Vite + TypeScript. No UI framework, no state library — plain CSS
 (`src/index.css`) and one auth context. Talks only to the FastAPI backend
 (`VITE_API_BASE_URL`); supabase-js is NOT used (auth flows go through the API,
@@ -44,9 +46,11 @@ for when supabase-js is introduced, e.g. Google OAuth or Realtime). Only
 
 Login (+ resend verification), Register, ForgotPassword, ResetPassword,
 Onboarding, Dashboard (stats + latest questions + prep score), Questions
-(filters/submit/upvote/flag + inline add-company), Reviews, Applications
-(5-column kanban), Prep (progress ring + topic checklist), Resume (AI
-analyzer), Companies (registry list + company profile with questions/reviews
+(filters/submit/upvote/flag + inline add-company; question-pool section
+under the same filters), Reviews, Applications
+(5-column kanban), Prep (progress ring + topic checklist + question-bank
+practice list for the user's domain), Resume (AI
+analyzer), Companies (registry list + company profile with community + question-bank questions/reviews
 and a manager-only "propose changes" form), Admin (moderation queue incl.
 pending companies and profile edits, flags, companies, user management,
 role-gated).

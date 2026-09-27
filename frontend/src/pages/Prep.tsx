@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, BankQuestion } from "../api";
+import { useLookups } from "../lookups";
 
 interface PrepData {
+  domain_id: string;
   topics: { topic: string; completed: boolean }[];
   score: number;
 }
@@ -31,10 +33,19 @@ export function ProgressRing({ score, size = 120 }: { score: number; size?: numb
 export default function Prep() {
   const [data, setData] = useState<PrepData | null>(null);
   const [error, setError] = useState("");
+  const [bank, setBank] = useState<BankQuestion[]>([]);
+  const { companyName } = useLookups();
 
   useEffect(() => {
     api<{ data: PrepData }>("/prep/").then((r) => setData(r.data)).catch((e) => setError(e.message));
   }, []);
+
+  // ponytail: first 50 only (API cap); add paging when a domain outgrows it
+  useEffect(() => {
+    if (!data?.domain_id) return;
+    api<{ data: BankQuestion[] }>(`/prep/questions?domain_id=${data.domain_id}&limit=50`)
+      .then((r) => setBank(r.data)).catch(() => {});
+  }, [data?.domain_id]);
 
   const toggle = async (topic: string, completed: boolean) => {
     // optimistic update
@@ -86,6 +97,20 @@ export default function Prep() {
               {t.topic}
             </span>
           </label>
+        ))}
+      </div>
+      <div className="card">
+        <h2>Practice questions ({bank.length})</h2>
+        {bank.length === 0 && <p className="muted">No practice questions for your domain yet.</p>}
+        {bank.map((q) => (
+          <div key={q.id} style={{ padding: "0.6rem 0", borderBottom: "1px solid var(--border)" }}>
+            <div className="row" style={{ marginBottom: "0.3rem" }}>
+              {q.company_id && <span className="badge">{companyName(q.company_id)}</span>}
+              {q.question_type !== "technical" && <span className="badge">{q.question_type}</span>}
+              <span className="muted">{q.role_title}</span>
+            </div>
+            <p style={{ margin: 0 }}>{q.question_text}</p>
+          </div>
         ))}
       </div>
     </>
