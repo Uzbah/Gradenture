@@ -1,0 +1,60 @@
+# Local development stack.
+#
+# Prerequisite: backend/.env and frontend/.env must already exist (copy from
+# their .env.example files and fill in — see README.md). Supabase itself is
+# NOT a container here: it's Supabase's hosted Postgres, so this compose
+# file only runs the two services this repo owns.
+#
+# Usage:
+#   docker compose up --build     # first run / after dependency changes
+#   docker compose up             # subsequent runs
+#   docker compose down           # stop
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: gradenture-backend
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./backend/.env
+    environment:
+      ENVIRONMENT: dev
+      REDIS_HOST: redis
+      RATE_LIMIT_STORAGE_URI: redis://redis:6379/0
+    volumes:
+      # Bind-mount source for hot reload (uvicorn --reload watches these files).
+      # Mounted as /app/backend, not /app: `backend` is the importable package.
+      - ./backend:/app/backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: gradenture-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      # The backend exits at startup if Redis is unreachable, so wait for it.
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: gradenture-frontend
+    ports:
+      - "5173:5173"
+    env_file:
+      - ./frontend/.env
+    volumes:
+      - ./frontend:/app
+      # Anonymous volume so the container's own node_modules (installed
+      # during build) isn't shadowed by the bind mount above, which would
+      # otherwise overwrite it with whatever is (or isn't) on the host.
+      - /app/node_modules
+    depends_on:
+      - backend

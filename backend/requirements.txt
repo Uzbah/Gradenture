@@ -1,0 +1,52 @@
+# Web framework
+fastapi==0.115.12
+uvicorn[standard]==0.34.2
+python-multipart==0.0.20
+
+# Auth & JWT
+PyJWT==2.12.1
+cryptography==47.0.0
+
+# Supabase
+supabase==2.29.0
+
+# Validation
+pydantic==2.13.3
+email-validator==2.3.0
+
+# Rate limiting
+slowapi==0.1.9
+
+# Input sanitization
+bleach==6.3.0
+
+# Email
+resend==2.29.0
+
+# HTTP client (JWKS fetch)
+requests==2.33.1
+
+# Environment variables
+python-dotenv==1.2.2
+
+# Resume analyzer
+google-generativeai==0.8.5
+pdfplumber==0.11.4
+python-docx==1.1.2
+
+# Settings
+pydantic-settings==2.7.0
+
+# Logging
+loguru==0.7.3
+
+# Shared cache (ban state, JWKS, rate limit storage)
+redis==5.2.1
+
+# Direct Postgres access, used only by backend/scripts/migrate.py
+psycopg[binary]==3.2.3
+
+# Tests and linting (dev only)
+pytest==8.3.4
+httpx==0.28.1
+ruff==0.8.4

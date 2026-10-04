@@ -1,0 +1,12 @@
+# Used as build context for the root (production) Dockerfile.
+.git
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/venv
+**/.venv
+**/dist
+**/.env
+**/.env.production
+README.md
+supabase/
