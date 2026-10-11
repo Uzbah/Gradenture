@@ -13,6 +13,30 @@ def get_me(user: dict) -> dict:
     return {"data": row}
 
 
+def get_my_submissions(user: dict) -> dict:
+    """The caller's own questions and reviews in every moderation state."""
+    # ponytail: newest 50 of each; paginate when a contributor outgrows that
+    questions = (
+        supabase.table("interview_questions")
+        .select("id, domain_id, company_id, role_title, question_text, notes, "
+                "question_type, difficulty, status, admin_note, created_at, updated_at")
+        .eq("submitted_by", user["sub"])
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    ).data
+    reviews = (
+        supabase.table("interview_reviews")
+        .select("id, domain_id, company_id, role_title, review_text, outcome, "
+                "status, admin_note, created_at, updated_at")
+        .eq("submitted_by", user["sub"])
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    ).data
+    return {"data": {"questions": questions, "reviews": reviews}}
+
+
 def get_domains() -> dict:
     result = (
         supabase.table("domains")

@@ -49,6 +49,13 @@ class QuestionEditSchema(BaseModel):
             raise ValueError("must be at least 20 characters")
         return v
 
+    @field_validator("notes")
+    @classmethod
+    def validate_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and len(v) > 500:
+            raise ValueError("must be at most 500 characters")
+        return v
+
 
 class FlagSchema(BaseModel):
     reason: str

@@ -1,4 +1,4 @@
-# CareerBridge (Gradenture)
+# Gradenture
 
 Interview prep and job application platform for university students and fresh graduates in Pakistan/South Asia.
 
@@ -23,6 +23,40 @@ any DB-backed feature works:
    UPDATE public.users SET role = 'super_admin' WHERE email = 'you@example.com';
    ```
 
+> Free-tier Supabase projects **pause after 7 days without activity**. If the
+> app suddenly can't reach the database (DNS errors, `getaddrinfo failed`), open
+> the Supabase dashboard and click **Restore project**.
+
+## 🚀 Quick start: run everything with one command
+
+Needs [Docker Desktop](https://www.docker.com/products/docker-desktop/) running,
+plus `backend/.env` and `frontend/.env` filled in (copy each folder's
+`.env.example`, see the setup sections below for the keys).
+
+```powershell
+docker compose up --build
+```
+
+| What | URL |
+|------|-----|
+| App (frontend) | http://localhost:5173 |
+| API | http://localhost:3001/api/v1 |
+| API docs (Swagger) | http://localhost:3001/docs |
+
+- **Edits reload live**: the source folders are mounted into the containers, so
+  saving a file restarts the backend / hot-reloads the page. No rebuild needed.
+- **Rebuild only when dependencies change**: use `--build` after editing
+  `backend/requirements.txt` or `frontend/package.json`; otherwise plain
+  `docker compose up` starts in seconds.
+- **Run in the background**: `docker compose up -d`, then `docker compose logs -f`
+  to watch output.
+- **Stop**: `Ctrl+C` (or `docker compose down` if started with `-d`).
+- **"Port is already allocated"**: a backend or frontend you started by hand is
+  still running. Stop it (`netstat -ano | findstr ":3001 :5173"` shows the PID).
+
+Prefer running without Docker? Follow the two setup sections below and use two
+terminals: one for the backend, one for the frontend.
+
 ## Backend setup
 
 ```powershell
@@ -38,7 +72,7 @@ Copy `.env.example` to `.env` and fill in:
 SUPABASE_URL=                # Project Settings → API
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_JWT_SECRET=         # Project Settings → API → JWT
-SMTP_PASS=                   # Resend API key (optional — emails not wired up yet)
+SMTP_PASS=                   # Resend API key (optional — emails are skipped until set)
 GEMINI_API_KEY=              # aistudio.google.com (required for resume analyzer)
 ```
 
@@ -86,17 +120,17 @@ running either of these.
 
 ### Development (hot reload, two containers)
 
-```bash
-docker compose up --build
-```
+`docker-compose.yml` is the one-command dev stack described in
+[Quick start](#-quick-start-run-everything-with-one-command). Details:
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:3001/api/v1 (Swagger at `/docs`)
-
-Source is bind-mounted into both containers, so edits on your host are picked
-up live (Vite HMR, uvicorn `--reload`). Re-run with `--build` whenever
-`requirements.txt` or `package.json` changes; otherwise plain `docker compose up`
-is enough. Stop with `docker compose down`.
+- The frontend waits for the backend's health check (`/api/v1` answering)
+  before it starts.
+- File watching uses polling (`WATCHFILES_FORCE_POLLING`, `CHOKIDAR_USEPOLLING`)
+  because Windows bind mounts don't forward file-change events into containers;
+  without it, hot reload silently stops working.
+- The containers keep their own Linux `node_modules` and Python packages;
+  your Windows `node_modules` and `.venv` are hidden from them (and keeping
+  `.venv` out cuts the backend's file polling from ~9k files to ~140).
 
 ### Production (single container)
 
@@ -156,15 +190,19 @@ supabase/migrations/         # SQL migrations (run in filename order)
 | POST | `/api/v1/auth/login` | — | Login |
 | POST | `/api/v1/auth/forgot-password` | — | Send reset email |
 | POST | `/api/v1/auth/reset-password` | JWT | Set new password |
+| POST | `/api/v1/auth/refresh` | — | Swap refresh token for a new session |
 | GET | `/api/v1/users/me` | JWT | Current user |
+| GET | `/api/v1/users/me/submissions` | JWT | Own questions + reviews, all statuses |
 | PATCH | `/api/v1/users/onboarding` | JWT | Complete onboarding |
 | GET | `/api/v1/domains` | — | List domains |
 | GET | `/api/v1/questions` | — | List approved questions (filters) |
 | POST | `/api/v1/questions` | JWT | Submit question (5/hr) |
 | POST | `/api/v1/questions/:id/upvote` | JWT | Toggle upvote |
+| PATCH | `/api/v1/questions/:id` | JWT (owner) | Edit + resubmit a `needs_edit` question |
 | POST | `/api/v1/questions/:id/flag` | JWT | Flag question |
 | GET | `/api/v1/reviews` | — | List approved reviews |
 | POST | `/api/v1/reviews` | JWT | Submit review (5/hr) |
+| PATCH | `/api/v1/reviews/:id` | JWT (owner) | Edit + resubmit a `needs_edit` review |
 | POST | `/api/v1/reviews/:id/flag` | JWT | Flag review |
 | GET | `/api/v1/companies` | — | List approved companies |
 | POST | `/api/v1/companies` | JWT | Submit company (pending) |

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Request
 
 from src.dependencies.auth import get_current_user
 from src.dependencies.rate_limit import limiter, user_rate_key
-from src.schemas.question_schema import QuestionSchema, FlagSchema
+from src.schemas.question_schema import FlagSchema, QuestionEditSchema, QuestionSchema
 from src.services import questions_service
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -37,6 +37,17 @@ def submit_question(
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return questions_service.submit_question(user, body)
+
+
+@router.patch("/{question_id}")
+@limiter.limit("10/hour", key_func=user_rate_key)
+def resubmit_question(
+    request: Request,
+    question_id: str,
+    body: QuestionEditSchema,
+    user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    return questions_service.resubmit_question(user, question_id, body)
 
 
 @router.post("/{question_id}/upvote")

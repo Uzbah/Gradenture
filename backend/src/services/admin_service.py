@@ -9,6 +9,7 @@ from src.schemas.company_schema import (
     CompanyUpdateSchema,
 )
 from src.services.companies_service import _slug
+from src.services import email_service
 from src.services.auth_helpers import invalidate_ban_cache
 from src.utils.sanitize import clean_text
 
@@ -30,6 +31,14 @@ def _audit(
         "target_id":   target_id,
         "detail":      detail,
     }).execute()
+
+
+def _email_of(user_id: str | None) -> str | None:
+    """Recipient for a notification; None when the user is gone (submitted_by is SET NULL)."""
+    if not user_id:
+        return None
+    row = maybe_row(supabase.table("users").select("email").eq("id", user_id))
+    return row["email"] if row else None
 
 
 def get_queue() -> dict:
@@ -63,7 +72,7 @@ def get_queue() -> dict:
 def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dict:
     q = maybe_row(
         supabase.table("interview_questions")
-        .select("submitted_by, status")
+        .select("submitted_by, question_text")
         .eq("id", question_id)
     )
     if not q:
@@ -80,12 +89,17 @@ def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dic
 
     _audit(user["sub"], f"question_{data.status}", "question", question_id,
            {"note": admin_note or None})
+    email_service.send_moderation_decision(
+        _email_of(q["submitted_by"]), "question", q["question_text"], data.status, admin_note
+    )
     return {"message": f"Question {data.status}"}
 
 
 def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
     r = maybe_row(
-        supabase.table("interview_reviews").select("submitted_by").eq("id", review_id)
+        supabase.table("interview_reviews")
+        .select("submitted_by, review_text")
+        .eq("id", review_id)
     )
     if not r:
         raise AppError(404, {"error": "Review not found"})
@@ -101,6 +115,9 @@ def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
 
     _audit(user["sub"], f"review_{data.status}", "review", review_id,
            {"note": admin_note or None})
+    email_service.send_moderation_decision(
+        _email_of(r["submitted_by"]), "review", r["review_text"], data.status, admin_note
+    )
     return {"message": f"Review {data.status}"}
 
 
@@ -267,8 +284,8 @@ def update_user_role(actor: dict, user_id: str, data: UpdateRoleSchema) -> dict:
 
 def warn_user(actor: dict, user_id: str) -> dict:
     _require_user(user_id)
-    # ponytail: recorded only — delivery needs the notification service wired up.
     _audit(actor["sub"], "user_warned", "user", user_id)
+    email_service.send_warn(_email_of(user_id))
     return {"message": "Warning recorded"}
 
 
@@ -283,6 +300,7 @@ def suspend_user(actor: dict, user_id: str) -> dict:
     invalidate_ban_cache(user_id)
 
     _audit(actor["sub"], "user_suspended", "user", user_id)
+    email_service.send_suspend(_email_of(user_id))
     return {"message": "User suspended"}
 
 
@@ -385,13 +403,19 @@ def decide_company_edit(
             changes["slug"] = _slug(changes["name"])
         supabase.table("companies").update(changes).eq("id", req["company_id"]).execute()
 
+    admin_note = clean_text(data.admin_note or "") or None
     supabase.table("company_edit_requests").update({
         "status":      data.status,
-        "admin_note":  clean_text(data.admin_note or "") or None,
+        "admin_note":  admin_note,
         "reviewed_by": user["sub"],
         "reviewed_at": "now()",
     }).eq("id", request_id).execute()
 
     _audit(user["sub"], f"company_edit_{data.status}", "company", req["company_id"],
            {"request_id": request_id, "changes": req["changes"]})
+    company = maybe_row(supabase.table("companies").select("name").eq("id", req["company_id"]))
+    email_service.send_company_edit_decision(
+        _email_of(req["requested_by"]), company["name"] if company else "your company",
+        data.status, admin_note,
+    )
     return {"message": f"Edit request {data.status}"}

@@ -38,7 +38,7 @@ export default function Login() {
     <div className="page-narrow">
       <Logo />
       <div className="card">
-        <h1>Log in to CareerBridge</h1>
+        <h1>Log in to Gradenture</h1>
         <form onSubmit={submit}>
           <label>Email</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />

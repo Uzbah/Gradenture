@@ -1,8 +1,8 @@
-# CareerBridge (Gradenture) — repo root
+# Gradenture — repo root
 
 > **Keep this file current.** If you add, remove, rename, or materially change any file in this folder, update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
 
-Monorepo for CareerBridge: interview prep + job-application tracker for students in Pakistan/South Asia. Three parts, each with its own CLAUDE.md:
+Monorepo for Gradenture: interview prep + job-application tracker for students in Pakistan/South Asia. Three parts, each with its own CLAUDE.md:
 
 | Folder | What lives there | Read next |
 |--------|------------------|-----------|

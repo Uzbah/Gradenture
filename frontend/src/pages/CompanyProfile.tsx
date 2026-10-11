@@ -159,7 +159,7 @@ function ManageProfile({ company, onDone, onError }: {
     <form className="card mt" onSubmit={submit}>
       <h3>Propose profile changes</h3>
       <p className="muted">
-        Edits are reviewed by a CareerBridge admin before they appear. You cannot
+        Edits are reviewed by a Gradenture admin before they appear. You cannot
         edit the questions or reviews on this page.
       </p>
       <div className="filters mt">

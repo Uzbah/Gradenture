@@ -15,6 +15,7 @@ import Applications from "./pages/Applications";
 import Prep from "./pages/Prep";
 import Resume from "./pages/Resume";
 import Admin from "./pages/Admin";
+import Profile from "./pages/Profile";
 
 const NAV_ITEMS = [
   { to: "/", end: true, icon: "home", label: "Dashboard" },
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { to: "/companies", end: false, icon: "companies", label: "Companies" },
   { to: "/applications", end: false, icon: "tracker", label: "Tracker" },
   { to: "/resume", end: false, icon: "resume", label: "Resume AI" },
+  { to: "/profile", end: false, icon: "profile", label: "Profile" },
 ] as const;
 
 function Layout() {
@@ -37,7 +39,7 @@ function Layout() {
     <div className="shell">
       <aside className="sidebar">
         <div className="sidebar-logo">
-          C<span className="logo-dot">.</span>
+          G<span className="logo-dot">.</span>
         </div>
         <nav className="sidebar-nav">
           {NAV_ITEMS.map((item) => (
@@ -95,6 +97,7 @@ export default function App() {
         <Route path="/companies/:companyId" element={<CompanyProfile />} />
         <Route path="/applications" element={<Applications />} />
         <Route path="/resume" element={<Resume />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />

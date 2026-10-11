@@ -10,6 +10,7 @@ const PATHS: Record<string, string> = {
   admin: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3Z",
   companies: "M4 21V6a1 1 0 0 1 1-1h6v16M11 21h9V10a1 1 0 0 0-1-1h-8M7 9h1M7 13h1M15 13h1M15 17h1",
   logout: "M9 4H5v16h4M14 8l4 4-4 4M18 12H9",
+  profile: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
 };
 
 export default function Icon({

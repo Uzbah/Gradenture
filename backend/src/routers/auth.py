@@ -7,6 +7,7 @@ from src.dependencies.rate_limit import limiter
 from src.schemas.auth_schema import (
     RegisterSchema,
     LoginSchema,
+    RefreshSchema,
     ForgotPasswordSchema,
     ResetPasswordSchema,
     ResendVerificationSchema,
@@ -26,6 +27,12 @@ def register(request: Request, body: RegisterSchema) -> dict:
 @limiter.limit("20/hour")
 def login(request: Request, body: LoginSchema) -> dict:
     return auth_service.login(body)
+
+
+@router.post("/refresh")
+@limiter.limit("60/hour")
+def refresh(request: Request, body: RefreshSchema) -> dict:
+    return auth_service.refresh(body)
 
 
 @router.post("/logout")

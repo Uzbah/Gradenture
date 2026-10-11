@@ -14,6 +14,11 @@ def get_me(user: Annotated[dict, Depends(get_current_user)]) -> dict:
     return users_service.get_me(user)
 
 
+@router.get("/users/me/submissions")
+def get_my_submissions(user: Annotated[dict, Depends(get_current_user)]) -> dict:
+    return users_service.get_my_submissions(user)
+
+
 @router.get("/domains", tags=["Domains"])
 def get_domains() -> dict:
     return users_service.get_domains()

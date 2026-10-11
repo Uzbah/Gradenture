@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from supabase import create_client, Client
+from supabase import ClientOptions, create_client, Client
 from dotenv import load_dotenv
 
 # Anchored to backend/.env rather than the CWD (see main.py).
@@ -17,6 +17,20 @@ def _init() -> Client:
 
 
 supabase: Client = _init()
+
+
+def auth_client() -> Client:
+    """Throwaway client for end-user auth calls (sign-up, sign-in, refresh, emails).
+
+    supabase-py swaps a client's Authorization header to the user's JWT on
+    SIGNED_IN / TOKEN_REFRESHED. On the shared client above that would make every
+    later query from every request run as that user, so user sessions never touch it.
+    """
+    return create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+        options=ClientOptions(auto_refresh_token=False, persist_session=False),
+    )
 
 
 def maybe_row(query) -> dict | None:

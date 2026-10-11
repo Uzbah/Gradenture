@@ -23,8 +23,8 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="CareerBridge API",
-    description="CareerBridge REST API",
+    title="Gradenture API",
+    description="Gradenture REST API",
     version="1.0.0",
 )
 
@@ -45,7 +45,7 @@ app.include_router(api_router)
 @app.get("/api/v1")
 def api_root() -> dict:
     return {
-        "message": "CareerBridge API v1",
+        "message": "Gradenture API v1",
         "docs":    "/docs",
         "auth":    "/api/v1/auth/login",
     }

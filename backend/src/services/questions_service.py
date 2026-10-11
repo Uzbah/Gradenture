@@ -1,6 +1,7 @@
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
-from src.schemas.question_schema import QuestionSchema, FlagSchema
+from src.schemas.question_schema import FlagSchema, QuestionEditSchema, QuestionSchema
+from src.services import email_service
 from src.utils.sanitize import clean_text
 
 
@@ -64,11 +65,45 @@ def submit_question(user: dict, data: QuestionSchema) -> dict:
         "status":        "pending",
     }).execute()
 
+    email_service.send_submission_confirmation(user.get("email"), "question", payload["question_text"])
     return {
         "id":      result.data[0]["id"],
         "status":  "pending",
         "message": "Question submitted for review",
     }
+
+
+def resubmit_question(user: dict, question_id: str, data: QuestionEditSchema) -> dict:
+    """needs_edit -> pending, owner only (moderation lifecycle)."""
+    q = maybe_row(
+        supabase.table("interview_questions")
+        .select("status, question_text")
+        .eq("id", question_id)
+        .eq("submitted_by", user["sub"])
+    )
+    if not q:
+        raise AppError(404, {"error": "Question not found"})
+    if q["status"] != "needs_edit":
+        raise AppError(409, {"error": "Only questions with an edit request can be resubmitted"})
+
+    changes = {k: clean_text(v) for k, v in data.model_dump(exclude_none=True).items()}
+    if not changes:
+        raise AppError(400, {"error": "No changes submitted"})
+
+    result = (
+        supabase.table("interview_questions")
+        .update({**changes, "status": "pending"})
+        .eq("id", question_id)
+        .eq("status", "needs_edit")   # guards a double submit
+        .execute()
+    )
+    if not result.data:
+        raise AppError(409, {"error": "Only questions with an edit request can be resubmitted"})
+
+    email_service.send_submission_confirmation(
+        user.get("email"), "question", changes.get("question_text", q["question_text"])
+    )
+    return {"id": question_id, "status": "pending", "message": "Question resubmitted for review"}
 
 
 def upvote_question(user: dict, question_id: str) -> dict:

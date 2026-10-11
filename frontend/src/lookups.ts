@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import { api, Company, Domain } from "./api";
 
+// Shared by Onboarding and Profile; values match the users table CHECKs.
+export const SKILL_LEVELS = [
+  { value: "beginner", label: "Beginner" },
+  { value: "intermediate", label: "Intermediate" },
+  { value: "advanced", label: "Advanced" },
+];
+export const GOALS = [
+  { value: "internship", label: "Internship hunting" },
+  { value: "first_job", label: "First full-time job" },
+  { value: "switch_career", label: "Switch career" },
+  { value: "level_up", label: "General upskilling" },
+];
+
 // ponytail: fetches first 50 companies only; add search/pagination when the list outgrows one dropdown
 export function useLookups() {
   const [domains, setDomains] = useState<Domain[]>([]);

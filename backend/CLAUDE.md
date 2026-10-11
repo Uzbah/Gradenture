@@ -1,4 +1,4 @@
-# CareerBridge Backend — CLAUDE.md
+# Gradenture Backend — CLAUDE.md
 
 > **Keep this file current.** If you add, remove, rename, or materially change any file in this folder (or its subfolder layout), update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
 
@@ -18,6 +18,7 @@ src/
 └── utils/sanitize.py   # bleach wrapper
 scripts/
 ├── ingest_questions.py # CSV → question_bank importer (dry run by default; --commit --actor <admin email>)
+├── send_deadline_reminders.py # T-7 / T-1 application deadline emails; schedule once a day
 └── data/               # reviewed import CSVs; file stem = `source` tag (undo: DELETE ... WHERE source = stem)
 ```
 
@@ -56,29 +57,36 @@ auto-reload when `NODE_ENV=development`). Swagger: `/docs`.
 
 ## Implemented
 
-Auth (register/login/logout/forgot/reset, email verification), onboarding,
-questions (submit/list/filter/upvote/flag), reviews, companies (user-submitted,
+Auth (register/login/logout/forgot/reset, email verification, `POST /auth/refresh`
+session refresh), onboarding (also the profile update), `GET /users/me/submissions`
+(own content in every status), questions (submit/list/filter/upvote/flag,
+owner resubmit `PATCH /questions/:id` when `needs_edit`), reviews (same resubmit), companies (user-submitted,
 admin-approved), applications tracker, prep roadmaps + preparedness score
 (`/prep`), curated question bank (`GET /prep/questions`, filters +
 full-text `q`; filled by `scripts/ingest_questions.py`), AI resume analyzer (Gemini 2.0 Flash), admin moderation queue,
 user/role management, rate limiting, JWT verification (HS256 + JWKS).
 
+Email (`services/email_service.py`, Resend SMTP): submission receipts, every
+moderation decision (with the note), company-edit decisions, warn, suspend, and
+deadline reminders via the script. Sends run on a background thread; with
+`SMTP_PASS` empty they are skipped and logged, never fatal.
+
+User-session auth calls (sign-up, sign-in, refresh, resend, reset email) go
+through `config.supabase.auth_client()`, a throwaway client — never the shared
+service-role `supabase`, whose auth header supabase-py would otherwise swap to
+the user's JWT on sign-in/refresh.
+
 ## Remaining (PRD features not yet built)
 
-- **Email notifications** — `email_service.py` exists but is NOT called on
-  moderation decisions (approve/reject/needs_edit) or deadline reminders.
-  Wire it into `admin_service.moderate_*` and add a reminder job.
+- **In-app notifications** — email only; no notifications table/bell yet.
+  No 14-day stale-application nudge yet (same shape as the reminder script).
 - **Admin analytics dashboard** (PRD 5.3.6) — no endpoint for submissions/day,
   approval rates, top contributors.
 - **Timed suspensions** (PRD 5.3.4) — `suspend_user` is a permanent ban
-  (`876600h`); no 1/7/30-day options. Unsuspend exists. `warn_user` records to
-  the audit log but delivers nothing until notifications are wired.
+  (`876600h`); no 1/7/30-day options. Unsuspend exists.
 - **Company management** (PRD 5.3.5) — no verified badge. Pending companies
   appear in `/admin/queue`; admin create/edit/merge and per-company managers
   are done. Logo is a URL field, not an upload (no Supabase Storage yet).
-- **Question resubmission** — `needs_edit` status exists and RLS allows the
-  submitter to update, but there's no API endpoint to edit + resubmit
-  (`QuestionEditSchema` exists unused in `question_schema.py`).
 - **Keyword search** on questions (PRD 5.2.3) — filters exist, no text search.
 - **Roadmaps in DB** — prep topics are a static dict in
   `services/prep_service.py` (`ponytail:` comment there); move to an
@@ -86,7 +94,8 @@ user/role management, rate limiting, JWT verification (HS256 + JWKS).
 - **Google OAuth** (PRD 5.1.1) — email/password only today.
 - **Phase 2**: AI mock interview (Anthropic API), mentorship, leaderboard,
   curated internship listings, Supabase Realtime queue updates.
-- **Tests** — no pytest suite. Three end-to-end smoke scripts run against a
+- **Tests** — no pytest suite. Four end-to-end smoke scripts run against a
   live dev server: `smoke_admin.py` (moderation, flags, users),
   `smoke_companies.py` (admin company CRUD + merge), `smoke_managers.py`
-  (per-company RBAC and queued profile edits).
+  (per-company RBAC and queued profile edits), `smoke_profile.py` (real login,
+  token refresh, My submissions, needs_edit → resubmit).

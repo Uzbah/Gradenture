@@ -4,9 +4,35 @@ export function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
-export function setToken(token: string | null) {
+// Clearing the access token (logout, dead session) clears the refresh token too.
+export function setToken(token: string | null, refreshToken?: string) {
   if (token) localStorage.setItem("token", token);
   else localStorage.removeItem("token");
+  if (refreshToken) localStorage.setItem("refresh_token", refreshToken);
+  else if (!token) localStorage.removeItem("refresh_token");
+}
+
+// One refresh at a time: parallel 401s all wait on the same call, because
+// Supabase rotates the refresh token and a second use of the old one fails.
+let refreshing: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  const refreshToken = localStorage.getItem("refresh_token");
+  if (!refreshToken) return Promise.resolve(false);
+  refreshing ??= fetch(`${BASE}/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  })
+    .then(async (res) => {
+      if (!res.ok) return false;
+      const json = await res.json();
+      setToken(json.access_token, json.refresh_token);
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => { refreshing = null; });
+  return refreshing;
 }
 
 export class ApiError extends Error {
@@ -32,8 +58,6 @@ export async function api<T = any>(
   opts: { method?: string; body?: any; token?: string } = {}
 ): Promise<T> {
   const headers: Record<string, string> = {};
-  const token = opts.token ?? getToken();
-  if (token) headers.Authorization = `Bearer ${token}`;
 
   let body: BodyInit | undefined;
   if (opts.body instanceof FormData) {
@@ -43,7 +67,18 @@ export async function api<T = any>(
     body = JSON.stringify(opts.body);
   }
 
-  const res = await fetch(`${BASE}${path}`, { method: opts.method ?? "GET", headers, body });
+  const send = () => {
+    const token = opts.token ?? getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    return fetch(`${BASE}${path}`, { method: opts.method ?? "GET", headers, body });
+  };
+
+  let res = await send();
+  // Access tokens last ~1h: on a 401, refresh once and retry. Skipped when the
+  // caller passed its own token (password-recovery link).
+  if (res.status === 401 && !opts.token && getToken() && (await refreshSession())) {
+    res = await send();
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     if (res.status === 401 && getToken()) {
@@ -86,6 +121,10 @@ export interface Review {
   review_text: string; interview_date: string; difficulty?: string;
   outcome?: string; status: string; created_at: string; submitted_by?: string;
   admin_note?: string;
+}
+export interface MySubmissions {
+  questions: (Question & { notes?: string | null })[];
+  reviews: Review[];
 }
 export interface Application {
   id: string; company_name: string; role_title: string;

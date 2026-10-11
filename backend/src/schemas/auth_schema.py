@@ -54,6 +54,17 @@ class ResendVerificationSchema(BaseModel):
         return _normalize_email(v)
 
 
+class RefreshSchema(BaseModel):
+    refresh_token: str
+
+    @field_validator("refresh_token")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty")
+        return v.strip()
+
+
 class ResetPasswordSchema(BaseModel):
     password: str
 

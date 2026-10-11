@@ -1,10 +1,11 @@
 import logging
 
-from src.config.supabase import supabase
+from src.config.supabase import auth_client, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.auth_schema import (
     RegisterSchema,
     LoginSchema,
+    RefreshSchema,
     ForgotPasswordSchema,
     ResetPasswordSchema,
     ResendVerificationSchema,
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 def register(data: RegisterSchema) -> dict:
     user_id = None
     try:
-        response = supabase.auth.sign_up({
+        response = auth_client().auth.sign_up({
             "email":    data.email,
             "password": data.password,
             "options":  {"data": {"role": "user"}},
@@ -65,7 +66,7 @@ def register(data: RegisterSchema) -> dict:
 
 def login(data: LoginSchema) -> dict:
     try:
-        response = supabase.auth.sign_in_with_password({
+        response = auth_client().auth.sign_in_with_password({
             "email":    data.email,
             "password": data.password,
         })
@@ -102,6 +103,25 @@ def login(data: LoginSchema) -> dict:
         raise AppError(500, {"error": "Login failed"})
 
 
+def refresh(data: RefreshSchema) -> dict:
+    """Swap a refresh token for a new session. Supabase rotates the refresh token,
+    so the client must store the new one."""
+    try:
+        response = auth_client().auth.refresh_session(data.refresh_token)
+    except Exception:
+        raise AppError(401, {"error": "Session expired, please log in again"})
+
+    if response.session is None or response.user is None:
+        raise AppError(401, {"error": "Session expired, please log in again"})
+    if is_user_banned(response.user.id):
+        raise AppError(403, {"error": "Account suspended"})
+
+    return {
+        "access_token":  response.session.access_token,
+        "refresh_token": response.session.refresh_token,
+    }
+
+
 def logout(user: dict) -> dict:
     token = user.get("token", "")
     try:
@@ -115,7 +135,7 @@ def logout(user: dict) -> dict:
 
 def resend_verification(data: ResendVerificationSchema) -> dict:
     try:
-        supabase.auth.resend({"type": "signup", "email": data.email})
+        auth_client().auth.resend({"type": "signup", "email": data.email})
     except Exception:
         pass
 
@@ -126,7 +146,7 @@ def resend_verification(data: ResendVerificationSchema) -> dict:
 
 def forgot_password(data: ForgotPasswordSchema) -> dict:
     try:
-        supabase.auth.reset_password_email(data.email)
+        auth_client().auth.reset_password_email(data.email)
     except Exception:
         pass
 

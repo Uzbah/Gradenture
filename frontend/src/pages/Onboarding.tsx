@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { api, Domain } from "../api";
 import { useAuth } from "../auth";
 import Logo from "../components/Logo";
+import { GOALS, SKILL_LEVELS } from "../lookups";
 
 export default function Onboarding() {
   const { user, loading, refresh } = useAuth();
@@ -53,16 +54,11 @@ export default function Onboarding() {
           </select>
           <label>Skill level</label>
           <select value={skillLevel} onChange={(e) => setSkillLevel(e.target.value)}>
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
+            {SKILL_LEVELS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           <label>Goal</label>
           <select value={goal} onChange={(e) => setGoal(e.target.value)}>
-            <option value="internship">Internship hunting</option>
-            <option value="first_job">First full-time job</option>
-            <option value="switch_career">Switch career</option>
-            <option value="level_up">General upskilling</option>
+            {GOALS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
           <label>University</label>
           <input value={university} onChange={(e) => setUniversity(e.target.value)} minLength={2} maxLength={100} required placeholder="e.g. FAST-NUCES Karachi" />

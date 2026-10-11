@@ -1,7 +1,8 @@
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.question_schema import FlagSchema
-from src.schemas.review_schema import ReviewSchema
+from src.schemas.review_schema import ReviewEditSchema, ReviewSchema
+from src.services import email_service
 from src.utils.sanitize import clean_text
 
 
@@ -57,11 +58,40 @@ def submit_review(user: dict, data: ReviewSchema) -> dict:
         "status":       "pending",
     }).execute()
 
+    email_service.send_submission_confirmation(user.get("email"), "review", payload["review_text"])
     return {
         "id":      result.data[0]["id"],
         "status":  "pending",
         "message": "Review submitted for moderation",
     }
+
+
+def resubmit_review(user: dict, review_id: str, data: ReviewEditSchema) -> dict:
+    """needs_edit -> pending, owner only (moderation lifecycle)."""
+    r = maybe_row(
+        supabase.table("interview_reviews")
+        .select("status")
+        .eq("id", review_id)
+        .eq("submitted_by", user["sub"])
+    )
+    if not r:
+        raise AppError(404, {"error": "Review not found"})
+    if r["status"] != "needs_edit":
+        raise AppError(409, {"error": "Only reviews with an edit request can be resubmitted"})
+
+    review_text = clean_text(data.review_text)
+    result = (
+        supabase.table("interview_reviews")
+        .update({"review_text": review_text, "status": "pending"})
+        .eq("id", review_id)
+        .eq("status", "needs_edit")   # guards a double submit
+        .execute()
+    )
+    if not result.data:
+        raise AppError(409, {"error": "Only reviews with an edit request can be resubmitted"})
+
+    email_service.send_submission_confirmation(user.get("email"), "review", review_text)
+    return {"id": review_id, "status": "pending", "message": "Review resubmitted for moderation"}
 
 
 def flag_review(user: dict, review_id: str, data: FlagSchema) -> dict:

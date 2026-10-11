@@ -1,4 +1,4 @@
-# CareerBridge Frontend — CLAUDE.md
+# Gradenture Frontend — CLAUDE.md
 
 > **Keep this file current.** If you add, remove, rename, or materially change any file in this folder (or its subfolder layout), update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
 
@@ -20,6 +20,10 @@ src/
 ├── index.css           # All styling (CSS variables, .card/.badge/.kanban etc.)
 └── pages/              # One file per route, forms inlined in the page
 ```
+
+Sessions: access + refresh token in localStorage; `api.ts` refreshes once on a
+401 (single shared refresh — Supabase rotates refresh tokens) and retries, and
+only logs out if the refresh fails.
 
 Conventions: token in localStorage; month fields use `<input type="month">`
 and send `YYYY-MM-01`; API errors are shown via `err.message` (already
@@ -51,7 +55,9 @@ under the same filters), Reviews, Applications
 (5-column kanban), Prep (progress ring + topic checklist + question-bank
 practice list for the user's domain), Resume (AI
 analyzer), Companies (registry list + company profile with community + question-bank questions/reviews
-and a manager-only "propose changes" form), Admin (moderation queue incl.
+and a manager-only "propose changes" form), Profile (My submissions with
+status + moderator note + edit-and-resubmit, profile details via the onboarding
+endpoint, change password), Admin (moderation queue incl.
 pending companies and profile edits, flags, companies, user management,
 role-gated).
 
@@ -60,11 +66,8 @@ role-gated).
 - **Company select is capped at 50** (`lookups.ts`, `ponytail:` comment) —
   the submission forms still use a plain <select>; `/companies` has server-side
   search (`?q=`) that these could reuse via MUI Autocomplete.
-- **No profile page** (PRD 5.1.3) — can't edit name/avatar/university after
-  onboarding; no contribution stats.
-- **No "my submissions" view** — users can't see their pending/rejected/
-  needs_edit questions or resubmit after an edit request (backend endpoint
-  also missing).
+- **Profile has no name/avatar** (PRD 5.1.3) — the users table has neither;
+  avatars need Supabase Storage.
 - **Admin gaps mirror the backend**: no analytics dashboard, no suspend-
   duration choice. (Flags tab, pending-companies approval and unsuspend exist.)
 - **Kanban is dropdown-move, not drag-and-drop** — deliberate; add dnd only
@@ -72,8 +75,6 @@ role-gated).
 - **Flag/moderation notes use `window.prompt`** — fine for MVP, replace with
   a modal if design matters.
 - **No keyword search box** on Questions (backend doesn't support it yet).
-- **No token refresh** — the Supabase access token expires (~1h) and the app
-  logs you out; wire refresh_token rotation if sessions feel too short.
 - **Phase 2**: preparedness radar chart, activity streak, AI mock interview
   UI, mentorship, leaderboard.
 - **No tests.**

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from src.dependencies.auth import get_current_user
 from src.dependencies.rate_limit import limiter, user_rate_key
 from src.schemas.question_schema import FlagSchema
-from src.schemas.review_schema import ReviewSchema
+from src.schemas.review_schema import ReviewEditSchema, ReviewSchema
 from src.services import reviews_service
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
@@ -34,6 +34,17 @@ def submit_review(
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return reviews_service.submit_review(user, body)
+
+
+@router.patch("/{review_id}")
+@limiter.limit("10/hour", key_func=user_rate_key)
+def resubmit_review(
+    request: Request,
+    review_id: str,
+    body: ReviewEditSchema,
+    user: Annotated[dict, Depends(get_current_user)],
+) -> dict:
+    return reviews_service.resubmit_review(user, review_id, body)
 
 
 @router.post("/{review_id}/flag", status_code=201)

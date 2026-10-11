@@ -35,3 +35,14 @@ class ReviewSchema(BaseModel):
         if len(v) > 100:
             raise ValueError("must be at most 100 characters")
         return v
+
+
+class ReviewEditSchema(BaseModel):
+    review_text: str
+
+    @field_validator("review_text")
+    @classmethod
+    def validate_review_text(cls, v: str) -> str:
+        if len(v) < 50:
+            raise ValueError("must be at least 50 characters")
+        return v
