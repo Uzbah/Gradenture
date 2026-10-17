@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link as RouterLink } from "react-router-dom";
+import { Box, Card, Grid, Text, TextField } from "@radix-ui/themes";
 import { api, Company } from "../api";
+import Icon from "../components/Icon";
+import { Empty, Notice, PageHeader, Pager, Tag } from "../components/ui";
 
 const PER_PAGE = 24;
 
@@ -17,56 +20,42 @@ export default function Companies() {
       const params = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
       if (q.trim()) params.set("q", q.trim());
       api<{ data: Company[]; count: number }>(`/companies/?${params}`)
-        .then((r) => { setCompanies(r.data); setCount(r.count); })
+        .then((r) => { setCompanies(r.data); setCount(r.count); setError(""); })
         .catch((e) => setError(e.message));
     }, 250);
     return () => clearTimeout(t);
   }, [page, q]);
 
-  const pages = Math.max(1, Math.ceil(count / PER_PAGE));
-
   return (
     <>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0 }}>Companies</h1>
-        <span className="muted">{count} in the registry</span>
-      </div>
+      <PageHeader title="Companies">
+        <Text size="2" color="gray">{count} in the registry</Text>
+      </PageHeader>
 
-      <div className="filters">
-        <input
-          placeholder="Search companies…"
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setPage(1); }}
-        />
-      </div>
+      <Box mb="4" maxWidth="420px">
+        <TextField.Root size="3" placeholder="Search companies…" aria-label="Search companies" value={q}
+                        onChange={(e) => { setQ(e.target.value); setPage(1); }}>
+          <TextField.Slot><Icon name="search" size={16} /></TextField.Slot>
+        </TextField.Root>
+      </Box>
 
-      {error && <p className="error">{error}</p>}
+      <Notice error={error} />
       {companies.length === 0 && !error && (
-        <p className="muted">{q ? `No companies match “${q}”.` : "No companies yet."}</p>
+        <Empty>{q ? `No companies match “${q}”.` : "No companies yet."}</Empty>
       )}
 
-      <div className="stat-grid">
+      <Grid columns={{ initial: "1", xs: "2", md: "3" }} gap="3">
         {companies.map((c) => (
-          <Link key={c.id} to={`/companies/${c.id}`} className="card" style={{ display: "block" }}>
-            <strong>{c.name}</strong>
-            <div className="row mt">
-              {c.industry && <span className="badge">{c.industry}</span>}
-            </div>
-          </Link>
+          <Card key={c.id} size="2" asChild>
+            <RouterLink to={`/companies/${c.id}`}>
+              <Text as="div" weight="bold">{c.name}</Text>
+              {c.industry && <Box mt="2"><Tag>{c.industry}</Tag></Box>}
+            </RouterLink>
+          </Card>
         ))}
-      </div>
+      </Grid>
 
-      {pages > 1 && (
-        <div className="row mt" style={{ justifyContent: "center" }}>
-          <button className="small secondary" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </button>
-          <span className="muted">Page {page} of {pages}</span>
-          <button className="small secondary" disabled={page >= pages} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </button>
-        </div>
-      )}
+      <Pager page={page} pages={Math.ceil(count / PER_PAGE)} onPage={setPage} />
     </>
   );
 }

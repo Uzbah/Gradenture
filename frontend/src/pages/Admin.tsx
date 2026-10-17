@@ -1,23 +1,32 @@
 import { FormEvent, useEffect, useState } from "react";
+import {
+  Box, Button, Card, DataList, Dialog, Flex, Heading, Strong, Table, Tabs, Text, TextField,
+} from "@radix-ui/themes";
 import { api, Company, CompanyEdit, CompanyManager, Flag, Question, Review, User } from "../api";
 import { useAuth } from "../auth";
+import {
+  Choice, ConfirmDialog, Empty, Field, FormDialog, Notice, ReasonDialog, Tag,
+} from "../components/ui";
 import { useLookups } from "../lookups";
 
 export default function Admin() {
-  const [tab, setTab] = useState<"queue" | "flags" | "companies" | "users">("queue");
   return (
     <>
-      <h1>Admin Panel</h1>
-      <div className="tabs">
-        <button className={tab === "queue" ? "active" : ""} onClick={() => setTab("queue")}>Moderation queue</button>
-        <button className={tab === "flags" ? "active" : ""} onClick={() => setTab("flags")}>Flags</button>
-        <button className={tab === "companies" ? "active" : ""} onClick={() => setTab("companies")}>Companies</button>
-        <button className={tab === "users" ? "active" : ""} onClick={() => setTab("users")}>Users</button>
-      </div>
-      {tab === "queue" && <Queue />}
-      {tab === "flags" && <Flags />}
-      {tab === "companies" && <CompaniesAdmin />}
-      {tab === "users" && <Users />}
+      <Heading size="8" mb="5">Admin Panel</Heading>
+      <Tabs.Root defaultValue="queue">
+        <Tabs.List>
+          <Tabs.Trigger value="queue">Moderation queue</Tabs.Trigger>
+          <Tabs.Trigger value="flags">Flags</Tabs.Trigger>
+          <Tabs.Trigger value="companies">Companies</Tabs.Trigger>
+          <Tabs.Trigger value="users">Users</Tabs.Trigger>
+        </Tabs.List>
+        <Box pt="5">
+          <Tabs.Content value="queue"><Queue /></Tabs.Content>
+          <Tabs.Content value="flags"><Flags /></Tabs.Content>
+          <Tabs.Content value="companies"><CompaniesAdmin /></Tabs.Content>
+          <Tabs.Content value="users"><Users /></Tabs.Content>
+        </Box>
+      </Tabs.Root>
     </>
   );
 }
@@ -42,9 +51,8 @@ function Queue() {
 
   useEffect(() => { load(); loadEdits(); }, []);
 
-  const decideEdit = async (id: string, status: "approved" | "rejected") => {
-    let admin_note: string | null = null;
-    if (status === "rejected") admin_note = window.prompt("Why is this rejected?") ?? "";
+  const decideEdit = async (id: string, status: "approved" | "rejected", admin_note: string | null = null) => {
+    setError("");
     try {
       await api(`/admin/company-edits/${id}`, { method: "PATCH", body: { status, admin_note } });
       loadEdits();
@@ -52,6 +60,7 @@ function Queue() {
   };
 
   const approveCompany = async (id: string) => {
+    setError("");
     try {
       await api(`/admin/companies/${id}`, { method: "PATCH" });
       load();
@@ -60,11 +69,8 @@ function Queue() {
     }
   };
 
-  const moderate = async (kind: "questions" | "reviews", id: string, status: string) => {
-    let admin_note: string | null = null;
-    if (status !== "approved") {
-      admin_note = window.prompt(`Note to the submitter (${status}):`) ?? "";
-    }
+  const moderate = async (kind: "questions" | "reviews", id: string, status: string, admin_note: string | null = null) => {
+    setError("");
     try {
       await api(`/admin/${kind}/${id}`, { method: "PATCH", body: { status, admin_note } });
       load();
@@ -74,81 +80,95 @@ function Queue() {
   };
 
   const Actions = ({ kind, id }: { kind: "questions" | "reviews"; id: string }) => (
-    <div className="row mt">
-      <button className="small" onClick={() => moderate(kind, id, "approved")}>Approve</button>
-      <button className="small danger" onClick={() => moderate(kind, id, "rejected")}>Reject</button>
-      <button className="small secondary" onClick={() => moderate(kind, id, "needs_edit")}>Request edit</button>
-    </div>
+    <Flex gap="2" mt="3" wrap="wrap">
+      <Button size="1" onClick={() => moderate(kind, id, "approved")}>Approve</Button>
+      <ReasonDialog
+        title="Reject submission" description="This note is sent to the submitter."
+        confirmLabel="Reject" color="red"
+        onSubmit={(note) => moderate(kind, id, "rejected", note)}
+        trigger={<Button size="1" variant="soft" color="red">Reject</Button>}
+      />
+      <ReasonDialog
+        title="Request an edit" description="Tell the submitter what to change."
+        confirmLabel="Request edit"
+        onSubmit={(note) => moderate(kind, id, "needs_edit", note)}
+        trigger={<Button size="1" variant="soft" color="gray">Request edit</Button>}
+      />
+    </Flex>
   );
 
   return (
     <>
-      {error && <p className="error">{error}</p>}
-      <h2>Pending companies ({companies.length})</h2>
-      {companies.length === 0 && <p className="muted">Nothing to approve 🎉</p>}
+      <Notice error={error} />
+      <Heading size="5" mb="3">Pending companies ({companies.length})</Heading>
+      {companies.length === 0 && <Empty>Nothing to approve.</Empty>}
       {companies.map((c) => (
-        <div className="card" key={c.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <strong>{c.name}</strong>
-            {c.industry && <span className="badge">{c.industry}</span>}
-          </div>
-          {c.website && <p className="muted">{c.website}</p>}
-          <div className="row mt">
-            <button className="small" onClick={() => approveCompany(c.id)}>Approve</button>
-          </div>
-        </div>
+        <Card size="2" key={c.id} mb="3">
+          <Flex gap="2" align="center" mb="1">
+            <Strong>{c.name}</Strong>
+            <Tag>{c.industry}</Tag>
+          </Flex>
+          {c.website && <Text as="p" size="2" color="gray">{c.website}</Text>}
+          <Button size="1" mt="3" onClick={() => approveCompany(c.id)}>Approve</Button>
+        </Card>
       ))}
 
-      <h2 className="mt">Pending profile edits ({edits.length})</h2>
-      {edits.length === 0 && <p className="muted">No profile changes awaiting review.</p>}
+      <Heading size="5" mt="6" mb="3">Pending profile edits ({edits.length})</Heading>
+      {edits.length === 0 && <Empty>No profile changes awaiting review.</Empty>}
       {edits.map((ed) => (
-        <div className="card" key={ed.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <strong>{ed.companies?.name ?? "Company"}</strong>
-            <span className="muted">{new Date(ed.created_at).toLocaleDateString()}</span>
-          </div>
-          <table>
-            <tbody>
-              {Object.entries(ed.changes).map(([field, value]) => (
-                <tr key={field}><td>{field}</td><td>{String(value)}</td></tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="row mt">
-            <button className="small" onClick={() => decideEdit(ed.id, "approved")}>Approve</button>
-            <button className="small danger" onClick={() => decideEdit(ed.id, "rejected")}>Reject</button>
-          </div>
-        </div>
+        <Card size="2" key={ed.id} mb="3">
+          <Flex gap="2" align="center" mb="3">
+            <Strong>{ed.companies?.name ?? "Company"}</Strong>
+            <Text size="1" color="gray">{new Date(ed.created_at).toLocaleDateString()}</Text>
+          </Flex>
+          <DataList.Root size="2">
+            {Object.entries(ed.changes).map(([field, value]) => (
+              <DataList.Item key={field}>
+                <DataList.Label>{field}</DataList.Label>
+                <DataList.Value>{String(value)}</DataList.Value>
+              </DataList.Item>
+            ))}
+          </DataList.Root>
+          <Flex gap="2" mt="3">
+            <Button size="1" onClick={() => decideEdit(ed.id, "approved")}>Approve</Button>
+            <ReasonDialog
+              title="Reject profile edit" description="This note is sent to the company manager."
+              confirmLabel="Reject" color="red"
+              onSubmit={(note) => decideEdit(ed.id, "rejected", note)}
+              trigger={<Button size="1" variant="soft" color="red">Reject</Button>}
+            />
+          </Flex>
+        </Card>
       ))}
 
-      <h2 className="mt">Pending questions ({questions.length})</h2>
-      {questions.length === 0 && <p className="muted">Queue is empty 🎉</p>}
+      <Heading size="5" mt="6" mb="3">Pending questions ({questions.length})</Heading>
+      {questions.length === 0 && <Empty>Queue is empty.</Empty>}
       {questions.map((q) => (
-        <div className="card" key={q.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{domainName(q.domain_id)}</span>
-            <span className="badge">{companyName(q.company_id)}</span>
-            <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>
-            <span className="muted">{q.role_title} · {new Date(q.created_at).toLocaleDateString()}</span>
-          </div>
-          <p>{q.question_text}</p>
-          {q.notes && <p className="muted">Notes: {q.notes}</p>}
+        <Card size="2" key={q.id} mb="3">
+          <Flex gap="2" align="center" wrap="wrap" mb="2">
+            <Tag>{domainName(q.domain_id)}</Tag>
+            <Tag>{companyName(q.company_id)}</Tag>
+            <Tag value={q.difficulty} />
+            <Text size="1" color="gray">{q.role_title} · {new Date(q.created_at).toLocaleDateString()}</Text>
+          </Flex>
+          <Text as="p">{q.question_text}</Text>
+          {q.notes && <Text as="p" size="2" color="gray" mt="2">Notes: {q.notes}</Text>}
           <Actions kind="questions" id={q.id} />
-        </div>
+        </Card>
       ))}
 
-      <h2 className="mt">Pending reviews ({reviews.length})</h2>
-      {reviews.length === 0 && <p className="muted">Queue is empty 🎉</p>}
+      <Heading size="5" mt="6" mb="3">Pending reviews ({reviews.length})</Heading>
+      {reviews.length === 0 && <Empty>Queue is empty.</Empty>}
       {reviews.map((r) => (
-        <div className="card" key={r.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{companyName(r.company_id)}</span>
-            {r.outcome && <span className="badge">{r.outcome}</span>}
-            <span className="muted">{r.role_title} · {new Date(r.created_at).toLocaleDateString()}</span>
-          </div>
-          <p>{r.review_text}</p>
+        <Card size="2" key={r.id} mb="3">
+          <Flex gap="2" align="center" wrap="wrap" mb="2">
+            <Tag>{companyName(r.company_id)}</Tag>
+            <Tag value={r.outcome} />
+            <Text size="1" color="gray">{r.role_title} · {new Date(r.created_at).toLocaleDateString()}</Text>
+          </Flex>
+          <Text as="p">{r.review_text}</Text>
           <Actions kind="reviews" id={r.id} />
-        </div>
+        </Card>
       ))}
     </>
   );
@@ -175,27 +195,25 @@ function Flags() {
 
   return (
     <>
-      {error && <p className="error">{error}</p>}
-      <h2>Open flags ({flags.length})</h2>
-      {flags.length === 0 && <p className="muted">No open flags 🎉</p>}
+      <Notice error={error} />
+      <Heading size="5" mb="3">Open flags ({flags.length})</Heading>
+      {flags.length === 0 && <Empty>No open flags.</Empty>}
       {flags.map((f) => (
-        <div className="card" key={f.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{f.content_type}</span>
-            {f.content && <span className="badge">{companyName(f.content.company_id)}</span>}
-            <span className="muted">{new Date(f.created_at).toLocaleDateString()}</span>
-          </div>
-          <p><strong>Reason:</strong> {f.reason}</p>
-          {f.content ? (
-            <p className="muted">{f.content.question_text ?? f.content.review_text}</p>
-          ) : (
-            <p className="muted">Content no longer exists.</p>
-          )}
-          <div className="row mt">
-            <button className="small" onClick={() => act(f.id, "resolved")}>Resolve</button>
-            <button className="small secondary" onClick={() => act(f.id, "dismissed")}>Dismiss</button>
-          </div>
-        </div>
+        <Card size="2" key={f.id} mb="3">
+          <Flex gap="2" align="center" mb="2">
+            <Tag value={f.content_type} />
+            {f.content && <Tag>{companyName(f.content.company_id)}</Tag>}
+            <Text size="1" color="gray">{new Date(f.created_at).toLocaleDateString()}</Text>
+          </Flex>
+          <Text as="p"><Strong>Reason:</Strong> {f.reason}</Text>
+          <Text as="p" size="2" color="gray" mt="1">
+            {f.content ? (f.content.question_text ?? f.content.review_text) : "Content no longer exists."}
+          </Text>
+          <Flex gap="2" mt="3">
+            <Button size="1" onClick={() => act(f.id, "resolved")}>Resolve</Button>
+            <Button size="1" variant="soft" color="gray" onClick={() => act(f.id, "dismissed")}>Dismiss</Button>
+          </Flex>
+        </Card>
       ))}
     </>
   );
@@ -204,10 +222,7 @@ function Flags() {
 function CompaniesAdmin() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [q, setQ] = useState("");
-  const [editing, setEditing] = useState<Company | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [merging, setMerging] = useState<Company | null>(null);
-  const [managing, setManaging] = useState<Company | null>(null);
+  const [formFor, setFormFor] = useState<Company | "new" | null>(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
@@ -223,157 +238,177 @@ function CompaniesAdmin() {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Throws so CompanyForm can show the error inside its dialog.
   const save = async (body: Partial<Company>, id?: string) => {
     setError(""); setInfo("");
-    try {
-      if (id) await api(`/admin/companies/${id}`, { method: "PATCH", body });
-      else await api("/admin/companies", { method: "POST", body });
-      setInfo(id ? "Company updated" : "Company created");
-      setEditing(null); setCreating(false);
-      load();
-    } catch (err: any) {
-      setError(err.message);
-    }
+    if (id) await api(`/admin/companies/${id}`, { method: "PATCH", body });
+    else await api("/admin/companies", { method: "POST", body });
+    setInfo(id ? "Company updated" : "Company created");
+    setFormFor(null);
+    load();
   };
 
   const merge = async (from: Company, intoId: string) => {
-    const into = companies.find((c) => c.id === intoId);
-    if (!into || !window.confirm(
-      `Merge "${from.name}" into "${into.name}"? All its questions and reviews move across and "${from.name}" is deleted. This cannot be undone.`
-    )) return;
     setError(""); setInfo("");
     try {
       const r = await api<{ message: string }>(`/admin/companies/${from.id}/merge`,
         { method: "POST", body: { into_id: intoId } });
       setInfo(r.message);
-      setMerging(null);
       load();
     } catch (err: any) {
       setError(err.message);
     }
   };
 
+  const editing = formFor && formFor !== "new" ? formFor : undefined;
+
   return (
     <>
-      {error && <p className="error">{error}</p>}
-      {info && <p className="success">{info}</p>}
+      <Notice error={error} success={info} />
 
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: "0.75rem" }}>
-        <input placeholder="Search companies…" value={q}
-               onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 280 }} />
-        <button className="small" onClick={() => { setCreating(true); setEditing(null); }}>
-          Add company
-        </button>
-      </div>
+      <Flex justify="between" align="center" gap="3" mb="3" wrap="wrap">
+        <Box flexGrow="1" maxWidth="300px">
+          <TextField.Root placeholder="Search companies…" aria-label="Search companies" value={q}
+                          onChange={(e) => setQ(e.target.value)} />
+        </Box>
+        <Button onClick={() => setFormFor("new")}>Add company</Button>
+      </Flex>
 
-      {creating && <CompanyForm onSave={(b) => save(b)} onCancel={() => setCreating(false)} />}
+      <FormDialog open={formFor !== null} onOpenChange={(o) => !o && setFormFor(null)}
+                  title={editing ? `Edit ${editing.name}` : "New company"}>
+        <CompanyForm key={editing?.id ?? "new"} company={editing} onSave={(b) => save(b, editing?.id)} />
+      </FormDialog>
 
-      <div className="card">
-        <table>
-          <thead>
-            <tr><th>Name</th><th>Industry</th><th>Status</th><th>Actions</th></tr>
-          </thead>
-          <tbody>
-            {companies.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.industry ?? "—"}</td>
-                <td>
-                  {c.status === "approved"
-                    ? <span className="badge easy">approved</span>
-                    : <span className="badge">pending</span>}
-                </td>
-                <td>
-                  <div className="row">
-                    <button className="small secondary"
-                            onClick={() => { setEditing(c); setCreating(false); }}>Edit</button>
-                    {c.status !== "approved" && (
-                      <button className="small" onClick={() => save({ status: "approved" }, c.id)}>
-                        Approve
-                      </button>
-                    )}
-                    <button className="small secondary"
-                            onClick={() => setMerging(merging?.id === c.id ? null : c)}>Merge</button>
-                    <button className="small secondary"
-                            onClick={() => setManaging(managing?.id === c.id ? null : c)}>Managers</button>
-                  </div>
-                  {managing?.id === c.id && <Managers company={c} onError={setError} />}
-                  {merging?.id === c.id && (
-                    <select defaultValue="" style={{ marginTop: "0.4rem" }}
-                            onChange={(e) => e.target.value && merge(c, e.target.value)}>
-                      <option value="">Merge into…</option>
-                      {companies.filter((o) => o.id !== c.id).map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
+      <Table.Root variant="surface">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeaderCell>Name</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Industry</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Actions</Table.ColumnHeaderCell>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {companies.map((c) => (
+            <Table.Row key={c.id} align="center">
+              <Table.RowHeaderCell>{c.name}</Table.RowHeaderCell>
+              <Table.Cell>{c.industry ?? "—"}</Table.Cell>
+              <Table.Cell><Tag value={c.status === "approved" ? "approved" : "pending"} /></Table.Cell>
+              <Table.Cell>
+                <Flex gap="2" wrap="wrap">
+                  <Button size="1" variant="soft" color="gray" onClick={() => setFormFor(c)}>Edit</Button>
+                  {c.status !== "approved" && (
+                    <Button size="1" onClick={() => save({ status: "approved" }, c.id).catch((e) => setError(e.message))}>
+                      Approve
+                    </Button>
                   )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {editing && (
-        <CompanyForm company={editing} onSave={(b) => save(b, editing.id)}
-                     onCancel={() => setEditing(null)} />
-      )}
+                  <MergeDialog company={c} others={companies.filter((o) => o.id !== c.id)} onMerge={(id) => merge(c, id)} />
+                  <Dialog.Root>
+                    <Dialog.Trigger><Button size="1" variant="soft" color="gray">Managers</Button></Dialog.Trigger>
+                    <Dialog.Content maxWidth="480px">
+                      <Dialog.Title>Managers of {c.name}</Dialog.Title>
+                      <Dialog.Description size="2" color="gray" mb="4">
+                        Managers may propose profile changes only. They cannot moderate the
+                        questions or reviews written about this company.
+                      </Dialog.Description>
+                      <Managers company={c} />
+                    </Dialog.Content>
+                  </Dialog.Root>
+                </Flex>
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
     </>
   );
 }
 
-function Managers({ company, onError }: { company: Company; onError: (m: string) => void }) {
+function MergeDialog({ company, others, onMerge }: {
+  company: Company; others: Company[]; onMerge: (intoId: string) => void;
+}) {
+  const [into, setInto] = useState("");
+  const target = others.find((o) => o.id === into);
+  return (
+    <Dialog.Root onOpenChange={() => setInto("")}>
+      <Dialog.Trigger><Button size="1" variant="soft" color="gray">Merge</Button></Dialog.Trigger>
+      <Dialog.Content maxWidth="480px">
+        <Dialog.Title>Merge {company.name}</Dialog.Title>
+        <Dialog.Description size="2" mb="4">
+          All its questions and reviews move to the target and <Strong>{company.name}</Strong> is
+          deleted. This cannot be undone.
+        </Dialog.Description>
+        <Field label="Merge into">
+          <Choice value={into} onChange={setInto} placeholder="Choose a company…"
+                  options={others.map((o) => ({ value: o.id, label: o.name }))} />
+        </Field>
+        <Flex gap="3" mt="4" justify="end">
+          <Dialog.Close><Button variant="soft" color="gray">Cancel</Button></Dialog.Close>
+          <Dialog.Close>
+            <Button color="red" disabled={!target} onClick={() => onMerge(into)}>
+              {target ? `Merge into ${target.name}` : "Merge"}
+            </Button>
+          </Dialog.Close>
+        </Flex>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}
+
+function Managers({ company }: { company: Company }) {
   const [managers, setManagers] = useState<CompanyManager[]>([]);
   const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
 
   const load = () =>
     api<{ data: CompanyManager[] }>(`/admin/companies/${company.id}/managers`)
       .then((r) => setManagers(r.data))
-      .catch((e) => onError(e.message));
+      .catch((e) => setError(e.message));
   useEffect(() => { load(); }, [company.id]);
 
   const grant = async (e: FormEvent) => {
     e.preventDefault();
+    setError("");
     try {
       await api(`/admin/companies/${company.id}/managers`, { method: "POST", body: { email } });
       setEmail(""); load();
-    } catch (err: any) { onError(err.message); }
+    } catch (err: any) { setError(err.message); }
   };
 
   const revoke = async (userId: string) => {
+    setError("");
     try {
       await api(`/admin/companies/${company.id}/managers/${userId}`, { method: "DELETE" });
       load();
-    } catch (err: any) { onError(err.message); }
+    } catch (err: any) { setError(err.message); }
   };
 
   return (
-    <div className="card mt">
-      <h3>Managers of {company.name}</h3>
-      <p className="muted">
-        Managers may propose profile changes only. They cannot moderate the
-        questions or reviews written about this company.
-      </p>
-      {managers.length === 0 && <p className="muted">No managers assigned.</p>}
-      {managers.map((m) => (
-        <div className="row mt" key={m.user_id} style={{ justifyContent: "space-between" }}>
-          <span>{m.users?.email ?? m.user_id}</span>
-          <button className="small danger" onClick={() => revoke(m.user_id)}>Revoke</button>
-        </div>
-      ))}
-      <form className="row mt" onSubmit={grant}>
-        <input type="email" required placeholder="user@example.com"
-               value={email} onChange={(e) => setEmail(e.target.value)} />
-        <button className="small" type="submit">Grant access</button>
+    <>
+      <Notice error={error} />
+      {managers.length === 0 && <Empty>No managers assigned.</Empty>}
+      <Flex direction="column" gap="2" mb="4">
+        {managers.map((m) => (
+          <Flex key={m.user_id} justify="between" align="center" gap="3">
+            <Text size="2">{m.users?.email ?? m.user_id}</Text>
+            <Button size="1" variant="soft" color="red" onClick={() => revoke(m.user_id)}>Revoke</Button>
+          </Flex>
+        ))}
+      </Flex>
+      <form onSubmit={grant}>
+        <Flex gap="2">
+          <TextField.Root style={{ flex: 1 }} type="email" required placeholder="user@example.com"
+                          aria-label="Manager email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <Button type="submit">Grant access</Button>
+        </Flex>
       </form>
-    </div>
+    </>
   );
 }
 
-function CompanyForm({ company, onSave, onCancel }: {
+function CompanyForm({ company, onSave }: {
   company?: Company;
-  onSave: (body: Partial<Company>) => void;
-  onCancel: () => void;
+  onSave: (body: Partial<Company>) => Promise<void>;
 }) {
   const [form, setForm] = useState({
     name: company?.name ?? "",
@@ -381,29 +416,39 @@ function CompanyForm({ company, onSave, onCancel }: {
     website: company?.website ?? "",
     logo_url: company?.logo_url ?? "",
   });
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  return (
-    <form className="card mt" onSubmit={(e) => {
-      e.preventDefault();
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(""); setBusy(true);
+    try {
       // drop blanks so PATCH never clears a field the admin left untouched
-      onSave(Object.fromEntries(Object.entries(form).filter(([, v]) => v !== "")));
-    }}>
-      <h3>{company ? `Edit ${company.name}` : "New company"}</h3>
-      <div className="filters mt">
-        <input required placeholder="Name" value={form.name} onChange={set("name")} />
-        <input placeholder="Industry" value={form.industry} onChange={set("industry")} />
-        <input type="url" placeholder="Website" value={form.website} onChange={set("website")} />
-        <input type="url" placeholder="Logo URL" value={form.logo_url} onChange={set("logo_url")} />
-      </div>
-      <div className="row mt">
-        <button type="submit">{company ? "Save changes" : "Create"}</button>
-        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
-      </div>
+      await onSave(Object.fromEntries(Object.entries(form).filter(([, v]) => v !== "")));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <Flex direction="column" gap="3" mt="3">
+        <Field label="Name"><TextField.Root required value={form.name} onChange={set("name")} /></Field>
+        <Field label="Industry"><TextField.Root value={form.industry} onChange={set("industry")} /></Field>
+        <Field label="Website"><TextField.Root type="url" value={form.website} onChange={set("website")} /></Field>
+        <Field label="Logo URL"><TextField.Root type="url" value={form.logo_url} onChange={set("logo_url")} /></Field>
+        <Notice error={error} />
+        <Flex justify="end"><Button type="submit" loading={busy}>{company ? "Save changes" : "Create"}</Button></Flex>
+      </Flex>
     </form>
   );
 }
+
+const ROLES = ["user", "admin", "super_admin"].map((r) => ({ value: r, label: r }));
 
 function Users() {
   const { user: me } = useAuth();
@@ -416,34 +461,11 @@ function Users() {
     api<{ data: User[] }>("/admin/users?limit=50").then((r) => setUsers(r.data)).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
-  const setRole = async (id: string, role: string) => {
+  const call = async (path: string, body: object | undefined, done: string) => {
     setError(""); setInfo("");
     try {
-      await api(`/admin/users/${id}/role`, { method: "PATCH", body: { role } });
-      setInfo("Role updated");
-      load();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const suspend = async (id: string, email: string) => {
-    if (!window.confirm(`Suspend ${email}? They will no longer be able to log in.`)) return;
-    setError(""); setInfo("");
-    try {
-      await api(`/admin/users/${id}/suspend`, { method: "PATCH" });
-      setInfo("User suspended");
-      load();
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
-  const unsuspend = async (id: string) => {
-    setError(""); setInfo("");
-    try {
-      await api(`/admin/users/${id}/unsuspend`, { method: "PATCH" });
-      setInfo("User unsuspended");
+      await api(path, { method: "PATCH", body });
+      setInfo(done);
       load();
     } catch (err: any) {
       setError(err.message);
@@ -451,44 +473,55 @@ function Users() {
   };
 
   return (
-    <div className="card">
-      {error && <p className="error">{error}</p>}
-      {info && <p className="success">{info}</p>}
-      <table>
-        <thead>
-          <tr><th>Email</th><th>Role</th><th>Onboarded</th><th>Status</th><th>Actions</th></tr>
-        </thead>
-        <tbody>
+    <>
+      <Notice error={error} success={info} />
+      <Table.Root variant="surface">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeaderCell>Email</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Role</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Onboarded</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Status</Table.ColumnHeaderCell>
+            <Table.ColumnHeaderCell>Actions</Table.ColumnHeaderCell>
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
           {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.email}</td>
-              <td>
+            <Table.Row key={u.id} align="center">
+              <Table.RowHeaderCell>{u.email}</Table.RowHeaderCell>
+              <Table.Cell>
                 {isSuper && u.id !== me?.id ? (
-                  <select value={u.role} style={{ width: "auto" }} onChange={(e) => setRole(u.id, e.target.value)}>
-                    <option value="user">user</option>
-                    <option value="admin">admin</option>
-                    <option value="super_admin">super_admin</option>
-                  </select>
+                  <Choice size="1" value={u.role} options={ROLES}
+                          onChange={(role) => call(`/admin/users/${u.id}/role`, { role }, "Role updated")} />
                 ) : (
                   u.role
                 )}
-              </td>
-              <td>{u.onboarding_complete ? "✓" : "—"}</td>
-              <td>{u.suspended_at ? <span className="badge hard">suspended</span> : "active"}</td>
-              <td>
+              </Table.Cell>
+              <Table.Cell>{u.onboarding_complete ? "Yes" : "No"}</Table.Cell>
+              <Table.Cell>{u.suspended_at ? <Tag value="suspended" /> : "active"}</Table.Cell>
+              <Table.Cell>
                 {/* plain admins may only suspend plain users (API-enforced too) */}
                 {u.id !== me?.id && (isSuper || u.role === "user") && (
                   u.suspended_at ? (
-                    <button className="small secondary" onClick={() => unsuspend(u.id)}>Unsuspend</button>
+                    <Button size="1" variant="soft" color="gray"
+                            onClick={() => call(`/admin/users/${u.id}/unsuspend`, undefined, "User unsuspended")}>
+                      Unsuspend
+                    </Button>
                   ) : (
-                    <button className="small danger" onClick={() => suspend(u.id, u.email)}>Suspend</button>
+                    <ConfirmDialog
+                      title={`Suspend ${u.email}?`}
+                      description="They will no longer be able to log in."
+                      confirmLabel="Suspend"
+                      onConfirm={() => call(`/admin/users/${u.id}/suspend`, undefined, "User suspended")}
+                      trigger={<Button size="1" variant="soft" color="red">Suspend</Button>}
+                    />
                   )
                 )}
-              </td>
-            </tr>
+              </Table.Cell>
+            </Table.Row>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Table.Body>
+      </Table.Root>
+    </>
   );
 }

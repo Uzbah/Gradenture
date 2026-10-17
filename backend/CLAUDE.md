@@ -27,7 +27,7 @@ Conventions: routers never touch the DB directly; all responses are
 `{"data": ...}` or `{"message": ...}`; errors raise `AppError(status, {"error": msg})`;
 user-submitted text goes through `clean_text()` before insert.
 
-## ⚠️ SETUP REQUIRED (blocking — nothing DB-backed works until done)
+## SETUP REQUIRED (blocking — nothing DB-backed works until done)
 
 The original Supabase project (`bbwoasmiqxuasjokmrpe.supabase.co`) was **deleted**
 — its DNS no longer resolves. To get running:

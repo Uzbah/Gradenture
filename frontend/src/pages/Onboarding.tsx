@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { Button, Flex, TextField } from "@radix-ui/themes";
 import { api, Domain } from "../api";
 import { useAuth } from "../auth";
-import Logo from "../components/Logo";
+import { AuthShell, Choice, Field, Loading, Notice, toOpts } from "../components/ui";
 import { GOALS, SKILL_LEVELS } from "../lookups";
 
 export default function Onboarding() {
@@ -20,7 +21,7 @@ export default function Onboarding() {
     api<{ data: Domain[] }>("/domains").then((res) => setDomains(res.data)).catch(() => {});
   }, []);
 
-  if (loading) return <div className="page center muted">Loading…</div>;
+  if (loading) return <Loading />;
   if (!user) return <Navigate to="/login" replace />;
   if (user.onboarding_complete) return <Navigate to="/" replace />;
 
@@ -42,32 +43,27 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="page-narrow">
-      <Logo />
-      <div className="card">
-        <h1>Welcome! Tell us about yourself</h1>
-        <form onSubmit={submit}>
-          <label>Primary domain</label>
-          <select value={domainId} onChange={(e) => setDomainId(e.target.value)} required>
-            <option value="">Select a domain…</option>
-            {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <label>Skill level</label>
-          <select value={skillLevel} onChange={(e) => setSkillLevel(e.target.value)}>
-            {SKILL_LEVELS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <label>Goal</label>
-          <select value={goal} onChange={(e) => setGoal(e.target.value)}>
-            {GOALS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <label>University</label>
-          <input value={university} onChange={(e) => setUniversity(e.target.value)} minLength={2} maxLength={100} required placeholder="e.g. FAST-NUCES Karachi" />
-          {error && <p className="error">{error}</p>}
-          <button className="mt" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "Saving…" : "Complete onboarding"}
-          </button>
-        </form>
-      </div>
-    </div>
+    <AuthShell title="Welcome! Tell us about yourself">
+      <form onSubmit={submit}>
+        <Flex direction="column" gap="4">
+          <Field label="Primary domain">
+            <Choice size="3" value={domainId} onChange={setDomainId} options={toOpts(domains)}
+                    placeholder="Select a domain…" required />
+          </Field>
+          <Field label="Skill level">
+            <Choice size="3" value={skillLevel} onChange={setSkillLevel} options={SKILL_LEVELS} />
+          </Field>
+          <Field label="Goal">
+            <Choice size="3" value={goal} onChange={setGoal} options={GOALS} />
+          </Field>
+          <Field label="University">
+            <TextField.Root size="3" value={university} onChange={(e) => setUniversity(e.target.value)}
+                            minLength={2} maxLength={100} required placeholder="e.g. FAST-NUCES Karachi" />
+          </Field>
+          <Notice error={error} />
+          <Button size="3" loading={busy}>Complete onboarding</Button>
+        </Flex>
+      </form>
+    </AuthShell>
   );
 }

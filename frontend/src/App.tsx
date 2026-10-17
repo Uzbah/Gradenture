@@ -1,5 +1,7 @@
 import { Navigate, NavLink, Outlet, Route, Routes } from "react-router-dom";
+import { IconButton, Tooltip } from "@radix-ui/themes";
 import { useAuth } from "./auth";
+import { Loading } from "./components/ui";
 import Icon from "./components/Icon";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -30,7 +32,7 @@ const NAV_ITEMS = [
 
 function Layout() {
   const { user, loading, logout } = useAuth();
-  if (loading) return <div className="page center muted">Loading…</div>;
+  if (loading) return <Loading />;
   if (!user) return <Navigate to="/login" replace />;
   if (!user.onboarding_complete) return <Navigate to="/onboarding" replace />;
   const isAdmin = user.role === "admin" || user.role === "super_admin";
@@ -38,39 +40,33 @@ function Layout() {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="sidebar-logo">
-          G<span className="logo-dot">.</span>
-        </div>
-        <nav className="sidebar-nav">
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => "sidebar-link" + (isActive ? " active" : "")}
-              title={item.label}
-            >
-              <Icon name={item.icon} />
-              <span className="sidebar-label">{item.label}</span>
-            </NavLink>
-          ))}
-          {isAdmin && (
-            <NavLink
-              to="/admin"
-              className={({ isActive }) => "sidebar-link admin" + (isActive ? " active" : "")}
-              title="Admin"
-            >
-              <Icon name="admin" />
-              <span className="sidebar-label">Admin</span>
-            </NavLink>
-          )}
-        </nav>
-        <div className="sidebar-foot">
-          <span className="sidebar-email">{user.email}</span>
-          <button className="sidebar-logout" onClick={logout} title="Log out">
-            <Icon name="logout" />
-          </button>
-        </div>
+          <span className="logo-mark">G.</span>
+          <nav className="sidebar-nav" aria-label="Main">
+            {NAV_ITEMS.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => "sidebar-link" + (isActive ? " active" : "")}
+              >
+                <Icon name={item.icon} />
+                {item.label}
+              </NavLink>
+            ))}
+            {isAdmin && (
+              <NavLink to="/admin" className={({ isActive }) => "sidebar-link admin" + (isActive ? " active" : "")}>
+                <Icon name="admin" />
+                Admin
+              </NavLink>
+            )}
+          </nav>
+          <div className="sidebar-foot">
+            <Tooltip content={`Log out ${user.email}`}>
+              <IconButton variant="ghost" color="gray" size="3" onClick={logout} aria-label="Log out">
+                <Icon name="logout" />
+              </IconButton>
+            </Tooltip>
+          </div>
       </aside>
       <main className="page">
         <Outlet />

@@ -1,6 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Button, Card, Flex, Grid, Text, TextArea, TextField } from "@radix-ui/themes";
 import { api, Review } from "../api";
-import { useLookups } from "../lookups";
+import Icon from "../components/Icon";
+import {
+  CheckField, Choice, Empty, Field, FormDialog, Notice, PageHeader, Pager, ReasonDialog, Tag, toOpts,
+} from "../components/ui";
+import { DIFFICULTIES, OUTCOMES, useLookups } from "../lookups";
+
+const PER_PAGE = 20;
 
 export default function Reviews() {
   const { domains, companies, domainName, companyName } = useLookups();
@@ -10,74 +17,72 @@ export default function Reviews() {
   const [filters, setFilters] = useState({ company_id: "", domain_id: "" });
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    const params = new URLSearchParams({ page: String(page), limit: "20" });
+    const params = new URLSearchParams({ page: String(page), limit: String(PER_PAGE) });
     Object.entries(filters).forEach(([k, v]) => v && params.set(k, v));
     api<{ data: Review[]; count: number }>(`/reviews/?${params}`)
       .then((r) => { setReviews(r.data); setCount(r.count); })
-      .catch(() => {});
+      .catch((e) => setError(e.message));
   }, [page, filters]);
 
-  const flag = async (id: string) => {
-    const reason = window.prompt("Why are you flagging this review? (min 5 characters)");
-    if (!reason) return;
+  const setFilter = (k: keyof typeof filters) => (v: string) => {
+    setPage(1);
+    setFilters((f) => ({ ...f, [k]: v }));
+  };
+
+  const flag = async (id: string, reason: string) => {
+    setError(""); setMessage("");
     try {
       await api(`/reviews/${id}/flag`, { method: "POST", body: { reason } });
       setMessage("Flagged — thanks, an admin will review it.");
     } catch (err: any) {
-      setMessage(err.message);
+      setError(err.message);
     }
   };
 
   return (
     <>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0 }}>Company Interview Reviews</h1>
-        <button onClick={() => setShowForm((s) => !s)}>{showForm ? "Close form" : "Write a review"}</button>
-      </div>
+      <PageHeader title="Company Interview Reviews">
+        <FormDialog open={showForm} onOpenChange={setShowForm} title="Write an interview review"
+                    trigger={<Button>Write a review</Button>}>
+          <ReviewForm domains={domains} companies={companies}
+                      onDone={(msg) => { setMessage(msg); setShowForm(false); }} />
+        </FormDialog>
+      </PageHeader>
 
-      {showForm && (
-        <ReviewForm domains={domains} companies={companies}
-          onDone={(msg) => { setMessage(msg); setShowForm(false); }} />
-      )}
-      {message && <p className="success">{message}</p>}
+      <Notice error={error} success={message} />
 
-      <div className="filters">
-        <select value={filters.company_id} onChange={(e) => { setPage(1); setFilters({ ...filters, company_id: e.target.value }); }}>
-          <option value="">All companies</option>
-          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={filters.domain_id} onChange={(e) => { setPage(1); setFilters({ ...filters, domain_id: e.target.value }); }}>
-          <option value="">All domains</option>
-          {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-      </div>
+      <Flex gap="2" wrap="wrap" mb="5">
+        <Choice value={filters.company_id} onChange={setFilter("company_id")} options={toOpts(companies)} all="All companies" />
+        <Choice value={filters.domain_id} onChange={setFilter("domain_id")} options={toOpts(domains)} all="All domains" />
+      </Flex>
 
-      {reviews.length === 0 && <p className="muted">No reviews yet.</p>}
+      {reviews.length === 0 && <Empty>No reviews yet.</Empty>}
       {reviews.map((r) => (
-        <div className="card" key={r.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{companyName(r.company_id)}</span>
-            {r.domain_id && <span className="badge">{domainName(r.domain_id)}</span>}
-            {r.difficulty && <span className={`badge ${r.difficulty}`}>{r.difficulty}</span>}
-            {r.outcome && <span className="badge">{r.outcome}</span>}
-            <span className="muted">{r.role_title} · {r.interview_date.slice(0, 7)}</span>
-          </div>
-          <p>{r.review_text}</p>
-          <div className="row mt">
-            <button className="ghost" onClick={() => flag(r.id)}>⚑ Flag</button>
-          </div>
-        </div>
+        <Card size="2" key={r.id} mb="3">
+          <Flex gap="2" align="center" wrap="wrap" mb="2">
+            <Tag>{companyName(r.company_id)}</Tag>
+            {r.domain_id && <Tag>{domainName(r.domain_id)}</Tag>}
+            <Tag value={r.difficulty} />
+            <Tag value={r.outcome} />
+            <Text size="1" color="gray">{r.role_title} · {r.interview_date.slice(0, 7)}</Text>
+          </Flex>
+          <Text as="p">{r.review_text}</Text>
+          <Flex mt="3" ml="1">
+            <ReasonDialog
+              title="Flag this review"
+              description="Tell the moderators what's wrong (min 5 characters)."
+              minLength={5} confirmLabel="Flag" color="red"
+              onSubmit={(reason) => flag(r.id, reason)}
+              trigger={<Button size="1" variant="ghost" color="gray"><Icon name="flag" size={14} /> Flag</Button>}
+            />
+          </Flex>
+        </Card>
       ))}
 
-      {count > 20 && (
-        <div className="row">
-          <button className="secondary small" disabled={page === 1} onClick={() => setPage(page - 1)}>Prev</button>
-          <span className="muted">Page {page} of {Math.ceil(count / 20)}</span>
-          <button className="secondary small" disabled={page >= Math.ceil(count / 20)} onClick={() => setPage(page + 1)}>Next</button>
-        </div>
-      )}
+      <Pager page={page} pages={Math.ceil(count / PER_PAGE)} onPage={setPage} />
     </>
   );
 }
@@ -93,7 +98,7 @@ function ReviewForm({ domains, companies, onDone }: {
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof typeof form) => (v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -121,56 +126,39 @@ function ReviewForm({ domains, companies, onDone }: {
   };
 
   return (
-    <div className="card">
-      <h2>Write an interview review</h2>
-      <form onSubmit={submit}>
-        <label>Company</label>
-        <select value={form.company_id} onChange={(e) => set("company_id", e.target.value)} required>
-          <option value="">Select…</option>
-          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <label>Domain (optional)</label>
-        <select value={form.domain_id} onChange={(e) => set("domain_id", e.target.value)}>
-          <option value="">—</option>
-          {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-        <label>Role applied for</label>
-        <input value={form.role_title} onChange={(e) => set("role_title", e.target.value)} maxLength={100} required />
-        <label>Your review (min 50 characters)</label>
-        <textarea value={form.review_text} onChange={(e) => set("review_text", e.target.value)} minLength={50} required />
-        <div className="row">
-          <div style={{ flex: 1 }}>
-            <label>Difficulty</label>
-            <select value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)}>
-              <option value="">—</option>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label>Outcome</label>
-            <select value={form.outcome} onChange={(e) => set("outcome", e.target.value)}>
-              <option value="">—</option>
-              <option value="offer">Offer received</option>
-              <option value="rejected">Rejected</option>
-              <option value="pending">Pending</option>
-              <option value="withdrew">Withdrew</option>
-              <option value="ghosted">Ghosted</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label>Interview date</label>
-            <input type="month" value={form.interview_month} onChange={(e) => set("interview_month", e.target.value)} required />
-          </div>
-        </div>
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input type="checkbox" style={{ width: "auto" }} checked={form.is_anonymous} onChange={(e) => set("is_anonymous", e.target.checked)} />
-          Submit anonymously
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button className="mt" disabled={busy}>{busy ? "Submitting…" : "Submit for review"}</button>
-      </form>
-    </div>
+    <form onSubmit={submit}>
+      <Flex direction="column" gap="3" mt="3">
+        <Grid columns={{ initial: "1", sm: "2" }} gap="3">
+          <Field label="Company">
+            <Choice value={form.company_id} onChange={set("company_id")} options={toOpts(companies)} required />
+          </Field>
+          <Field label="Domain (optional)">
+            <Choice value={form.domain_id} onChange={set("domain_id")} options={toOpts(domains)} all="—" />
+          </Field>
+        </Grid>
+        <Field label="Role applied for">
+          <TextField.Root value={form.role_title} onChange={(e) => set("role_title")(e.target.value)} maxLength={100} required />
+        </Field>
+        <Field label="Your review" hint="At least 50 characters">
+          <TextArea rows={5} value={form.review_text} onChange={(e) => set("review_text")(e.target.value)}
+                    minLength={50} required />
+        </Field>
+        <Grid columns={{ initial: "1", sm: "3" }} gap="3">
+          <Field label="Difficulty">
+            <Choice value={form.difficulty} onChange={set("difficulty")} options={DIFFICULTIES} all="—" />
+          </Field>
+          <Field label="Outcome">
+            <Choice value={form.outcome} onChange={set("outcome")} options={OUTCOMES} all="—" />
+          </Field>
+          <Field label="Interview date">
+            <TextField.Root type="month" value={form.interview_month}
+                            onChange={(e) => set("interview_month")(e.target.value)} required />
+          </Field>
+        </Grid>
+        <CheckField checked={form.is_anonymous} onChange={set("is_anonymous")}>Submit anonymously</CheckField>
+        <Notice error={error} />
+        <Flex justify="end"><Button loading={busy}>Submit for review</Button></Flex>
+      </Flex>
+    </form>
   );
 }

@@ -53,3 +53,23 @@ export function useLookups() {
 
   return { domains, companies, domainName, companyName, reloadCompanies: () => loadCompanies(true) };
 }
+
+// Enum options for <Choice>; values match the DB CHECKs / Postgres enums.
+export const DIFFICULTIES = [
+  { value: "easy", label: "Easy" },
+  { value: "medium", label: "Medium" },
+  { value: "hard", label: "Hard" },
+];
+export const QUESTION_TYPES = [
+  { value: "technical", label: "Technical" },
+  { value: "behavioural", label: "Behavioural" },
+  { value: "hr", label: "HR" },
+  { value: "case_study", label: "Case study" },
+];
+export const OUTCOMES = [
+  { value: "offer", label: "Offer received" },
+  { value: "rejected", label: "Rejected" },
+  { value: "pending", label: "Pending" },
+  { value: "withdrew", label: "Withdrew" },
+  { value: "ghosted", label: "Ghosted" },
+];

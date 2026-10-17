@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Box, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { api, BankQuestion } from "../api";
+import { CheckField, Empty, Loading, Notice, Tag } from "../components/ui";
 import { useLookups } from "../lookups";
 
 interface PrepData {
@@ -14,16 +16,16 @@ export function ProgressRing({ score, size = 120 }: { score: number; size?: numb
   const circ = 2 * Math.PI * r;
   return (
     <svg width={size} height={size} role="img" aria-label={`Preparedness ${score}%`}>
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--border)" strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--gray-a4)" strokeWidth={stroke} />
       <circle
         cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="var(--primary)" strokeWidth={stroke} strokeLinecap="round"
+        stroke="var(--accent-9)" strokeWidth={stroke} strokeLinecap="round"
         strokeDasharray={circ} strokeDashoffset={circ * (1 - score / 100)}
         transform={`rotate(-90 ${size / 2} ${size / 2})`}
         style={{ transition: "stroke-dashoffset 0.4s" }}
       />
       <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central"
-        fontSize={size / 4.5} fontWeight="700" fill="var(--text)">
+        fontSize={size / 4.5} fontWeight="700" fill="var(--gray-12)">
         {score}%
       </text>
     </svg>
@@ -63,56 +65,60 @@ export default function Prep() {
     }
   };
 
-  if (error) return <><h1>Interview Prep</h1><p className="error">{error}</p></>;
-  if (!data) return <p className="muted">Loading…</p>;
+  if (error && !data) return <><Heading size="8" mb="5">Interview Prep</Heading><Notice error={error} /></>;
+  if (!data) return <Loading />;
 
   const done = data.topics.filter((t) => t.completed).length;
 
   return (
     <>
-      <h1>Interview Prep</h1>
-      <div className="card">
-        <div className="row" style={{ gap: "1.5rem" }}>
+      <Heading size="8" mb="5">Interview Prep</Heading>
+      <Notice error={error} />
+      <Card size="3" mb="4">
+        <Flex gap="5" align="center" wrap="wrap">
           <ProgressRing score={data.score} />
-          <div>
-            <h2 style={{ marginBottom: "0.25rem" }}>Preparedness score</h2>
-            <p className="muted">
+          <Box>
+            <Heading size="5" mb="1">Preparedness score</Heading>
+            <Text as="p" size="2" color="gray">
               {done} of {data.topics.length} topics studied in your domain.
-              {data.score === 100 ? " You're interview-ready! 🎉" : " Check off topics as you study them."}
-            </p>
-          </div>
+              {data.score === 100 ? " You're interview-ready!" : " Check off topics as you study them."}
+            </Text>
+          </Box>
+        </Flex>
+      </Card>
+
+      <Card size="3" mb="4">
+        <Heading size="5" mb="2">Roadmap topics</Heading>
+        <div className="divided">
+          {data.topics.map((t) => (
+            <Box key={t.topic} py="2">
+              <CheckField checked={t.completed} onChange={(v) => toggle(t.topic, v)}>
+                <Text color={t.completed ? "gray" : undefined}
+                      style={{ textDecoration: t.completed ? "line-through" : undefined }}>
+                  {t.topic}
+                </Text>
+              </CheckField>
+            </Box>
+          ))}
         </div>
-      </div>
-      <div className="card">
-        <h2>Roadmap topics</h2>
-        {data.topics.map((t) => (
-          <label key={t.topic} style={{ display: "flex", gap: "0.6rem", alignItems: "center", padding: "0.45rem 0", margin: 0, fontWeight: 400, cursor: "pointer", borderBottom: "1px solid var(--border)" }}>
-            <input
-              type="checkbox"
-              style={{ width: "auto" }}
-              checked={t.completed}
-              onChange={(e) => toggle(t.topic, e.target.checked)}
-            />
-            <span style={{ textDecoration: t.completed ? "line-through" : "none", color: t.completed ? "var(--muted)" : "var(--text)" }}>
-              {t.topic}
-            </span>
-          </label>
-        ))}
-      </div>
-      <div className="card">
-        <h2>Practice questions ({bank.length})</h2>
-        {bank.length === 0 && <p className="muted">No practice questions for your domain yet.</p>}
-        {bank.map((q) => (
-          <div key={q.id} style={{ padding: "0.6rem 0", borderBottom: "1px solid var(--border)" }}>
-            <div className="row" style={{ marginBottom: "0.3rem" }}>
-              {q.company_id && <span className="badge">{companyName(q.company_id)}</span>}
-              {q.question_type !== "technical" && <span className="badge">{q.question_type}</span>}
-              <span className="muted">{q.role_title}</span>
-            </div>
-            <p style={{ margin: 0 }}>{q.question_text}</p>
-          </div>
-        ))}
-      </div>
+      </Card>
+
+      <Card size="3">
+        <Heading size="5" mb="2">Practice questions ({bank.length})</Heading>
+        {bank.length === 0 && <Empty>No practice questions for your domain yet.</Empty>}
+        <div className="divided">
+          {bank.map((q) => (
+            <Box key={q.id} py="3">
+              <Flex gap="2" align="center" wrap="wrap" mb="1">
+                {q.company_id && <Tag>{companyName(q.company_id)}</Tag>}
+                {q.question_type !== "technical" && <Tag value={q.question_type} />}
+                <Text size="1" color="gray">{q.role_title}</Text>
+              </Flex>
+              <Text as="p" size="2">{q.question_text}</Text>
+            </Box>
+          ))}
+        </div>
+      </Card>
     </>
   );
 }

@@ -1,6 +1,8 @@
 # Local development stack: backend + frontend with one command.
 #
-#   docker compose up --build     # first run / after requirements.txt or package.json change
+#   docker compose up --build     # first run / after requirements.txt change
+#   docker compose up --build -V  # after package.json change (-V renews the
+#                                 # node_modules volume; --build alone keeps the old one)
 #   docker compose up             # every other time
 #   docker compose down           # stop
 #

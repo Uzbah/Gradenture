@@ -1,8 +1,9 @@
 import { FormEvent, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { Button, Flex, Text, TextField } from "@radix-ui/themes";
 import { useAuth } from "../auth";
 import { api } from "../api";
-import Logo from "../components/Logo";
+import { AuthShell, Field, Notice, RLink } from "../components/ui";
 
 export default function Login() {
   const { login } = useAuth();
@@ -28,35 +29,38 @@ export default function Login() {
 
   const resend = async () => {
     setError("");
-    const res = await api<{ message: string }>("/auth/resend-verification", {
-      method: "POST", body: { email },
-    });
-    setInfo(res.message);
+    try {
+      const res = await api<{ message: string }>("/auth/resend-verification", {
+        method: "POST", body: { email },
+      });
+      setInfo(res.message);
+    } catch (err: any) {
+      setError(err.message);
+    }
   };
 
   return (
-    <div className="page-narrow">
-      <Logo />
-      <div className="card">
-        <h1>Log in to Gradenture</h1>
-        <form onSubmit={submit}>
-          <label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <label>Password</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p className="error">{error}</p>}
+    <AuthShell title="Log in to Gradenture">
+      <form onSubmit={submit}>
+        <Flex direction="column" gap="4">
+          <Field label="Email">
+            <TextField.Root size="3" type="email" autoComplete="email" value={email}
+                            onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <Field label="Password">
+            <TextField.Root size="3" type="password" autoComplete="current-password" value={password}
+                            onChange={(e) => setPassword(e.target.value)} required />
+          </Field>
+          <Notice error={error} success={info} />
           {error.toLowerCase().includes("verify") && (
-            <button type="button" className="ghost" onClick={resend}>Resend verification email</button>
+            <Button type="button" variant="soft" color="gray" onClick={resend}>Resend verification email</Button>
           )}
-          {info && <p className="success">{info}</p>}
-          <button className="mt" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "Logging in…" : "Log in"}
-          </button>
-        </form>
-        <p className="muted mt">
-          No account? <Link to="/register">Register</Link> · <Link to="/forgot-password">Forgot password?</Link>
-        </p>
-      </div>
-    </div>
+          <Button size="3" loading={busy}>Log in</Button>
+        </Flex>
+      </form>
+      <Text as="p" size="2" color="gray" mt="4">
+        No account? <RLink to="/register">Register</RLink> · <RLink to="/forgot-password">Forgot password?</RLink>
+      </Text>
+    </AuthShell>
   );
 }

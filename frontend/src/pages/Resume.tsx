@@ -1,5 +1,7 @@
 import { FormEvent, useRef, useState } from "react";
+import { Badge, Box, Button, Card, Flex, Heading, Text, TextArea } from "@radix-ui/themes";
 import { api } from "../api";
+import { Field, Notice } from "../components/ui";
 
 interface Analysis {
   score: number;
@@ -37,28 +39,40 @@ export default function Resume() {
 
   return (
     <>
-      <h1>AI Resume Analyzer</h1>
-      <div className="card">
+      <Heading size="8" mb="5">AI Resume Analyzer</Heading>
+      <Card size="3" mb="4" asChild>
         <form onSubmit={submit}>
-          <label>Resume (PDF or DOCX, max 5MB)</label>
-          <input type="file" ref={fileRef} accept=".pdf,.docx" required />
-          <label>Job description (optional — enables keyword gap analysis)</label>
-          <textarea value={jd} onChange={(e) => setJd(e.target.value)} placeholder="Paste the job description here…" />
-          {error && <p className="error">{error}</p>}
-          <button className="mt" disabled={busy}>{busy ? "Analyzing… (this takes ~15s)" : "Analyze"}</button>
-          <p className="muted mt">Limited to 3 analyses per hour.</p>
+          <Flex direction="column" gap="4">
+            <Field label="Resume" hint="PDF or DOCX, max 5MB">
+              <input className="file-input" type="file" ref={fileRef} accept=".pdf,.docx" required />
+            </Field>
+            <Field label="Job description (optional)" hint="Enables keyword gap analysis">
+              <TextArea rows={5} value={jd} onChange={(e) => setJd(e.target.value)}
+                        placeholder="Paste the job description here…" />
+            </Field>
+            <Notice error={error} />
+            <Flex align="center" gap="3" wrap="wrap">
+              <Button size="3" loading={busy}>Analyze</Button>
+              <Text size="2" color="gray">
+                {busy ? "Analyzing… this takes ~15s." : "Limited to 3 analyses per hour."}
+              </Text>
+            </Flex>
+          </Flex>
         </form>
-      </div>
+      </Card>
 
       {result && (
-        <div className="card">
-          <h2>Score: {result.score}/10</h2>
-          <p>{result.summary}</p>
+        <Card size="3">
+          <Flex align="center" gap="3" mb="3">
+            <Heading size="6">Score</Heading>
+            <Badge size="3" variant="solid">{result.score}/10</Badge>
+          </Flex>
+          <Text as="p">{result.summary}</Text>
           <Section title="Strengths" items={result.strengths} />
           <Section title="Weaknesses" items={result.weaknesses} />
           <Section title="Improvements" items={result.improvements} />
-          {result.keyword_gaps?.length > 0 && <Section title="Missing keywords" items={result.keyword_gaps} />}
-        </div>
+          <Section title="Missing keywords" items={result.keyword_gaps} />
+        </Card>
       )}
     </>
   );
@@ -67,11 +81,11 @@ export default function Resume() {
 function Section({ title, items }: { title: string; items: string[] }) {
   if (!items?.length) return null;
   return (
-    <div className="mt">
-      <h3>{title}</h3>
-      <ul style={{ paddingLeft: "1.25rem" }}>
-        {items.map((s, i) => <li key={i}>{s}</li>)}
+    <Box mt="4">
+      <Heading size="4" mb="2">{title}</Heading>
+      <ul style={{ paddingLeft: "1.25rem", margin: 0 }}>
+        {items.map((s, i) => <li key={i}><Text size="2">{s}</Text></li>)}
       </ul>
-    </div>
+    </Box>
   );
 }

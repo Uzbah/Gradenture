@@ -1,5 +1,5 @@
 // Inline SVG icons, 24px grid, stroke 1.8–2.4, round caps — matches the
-// Mono + Lime design system (see frontend/CLAUDE.md / design.md).
+// Mono + Lime design system. Used beside Radix Themes components.
 const PATHS: Record<string, string> = {
   home: "M3 10.5 12 3l9 7.5V21h-6v-6h-6v6H3Z",
   questions: "M12 3 2 8.2l10 5 10-5L12 3ZM2 13.4l10 5 10-5",
@@ -11,6 +11,10 @@ const PATHS: Record<string, string> = {
   companies: "M4 21V6a1 1 0 0 1 1-1h6v16M11 21h9V10a1 1 0 0 0-1-1h-8M7 9h1M7 13h1M15 13h1M15 17h1",
   logout: "M9 4H5v16h4M14 8l4 4-4 4M18 12H9",
   profile: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0",
+  x: "M6 6l12 12M18 6 6 18",
+  up: "M12 19V5M5 12l7-7 7 7",
+  flag: "M5 21V4h11l-1.5 4L16 12H5",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Zm5-2 4 4",
 };
 
 export default function Icon({

@@ -1,6 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Button, Card, Flex, Grid, Heading, Text, TextArea, TextField } from "@radix-ui/themes";
 import { api, BankQuestion, Question } from "../api";
-import { useLookups } from "../lookups";
+import Icon from "../components/Icon";
+import {
+  CheckField, Choice, Empty, Field, FormDialog, Notice, PageHeader, Pager, ReasonDialog, Tag, toOpts,
+} from "../components/ui";
+import { DIFFICULTIES, QUESTION_TYPES, useLookups } from "../lookups";
 
 const PER_PAGE = 20;
 
@@ -15,6 +20,7 @@ export default function Questions() {
   const [filters, setFilters] = useState({ domain_id: "", company_id: "", difficulty: "", question_type: "" });
   const [showForm, setShowForm] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
   const query = (p: number) => {
     const params = new URLSearchParams({ page: String(p), limit: String(PER_PAGE) });
@@ -26,7 +32,7 @@ export default function Questions() {
   useEffect(() => {
     api<{ data: Question[]; count: number }>(`/questions/?${query(page)}`)
       .then((r) => { setQuestions(r.data); setCount(r.count); })
-      .catch(() => {});
+      .catch((e) => setError(e.message));
   }, [page, filters]);
 
   // curated question_bank, same filters
@@ -36,121 +42,99 @@ export default function Questions() {
       .catch(() => {});
   }, [bankPage, filters]);
 
-  const setFilter = (k: keyof typeof filters, v: string) => {
+  const setFilter = (k: keyof typeof filters) => (v: string) => {
     setPage(1); setBankPage(1);
     setFilters((f) => ({ ...f, [k]: v }));
   };
 
   const upvote = async (id: string) => {
+    setError("");
     try {
       const res = await api<{ upvotes: number }>(`/questions/${id}/upvote`, { method: "POST" });
       setQuestions((qs) => qs.map((q) => (q.id === id ? { ...q, upvotes: res.upvotes } : q)));
     } catch (err: any) {
-      setMessage(err.message);
+      setError(err.message);
     }
   };
 
-  const flag = async (id: string) => {
-    const reason = window.prompt("Why are you flagging this question? (min 5 characters)");
-    if (!reason) return;
+  const flag = async (id: string, reason: string) => {
+    setError(""); setMessage("");
     try {
       await api(`/questions/${id}/flag`, { method: "POST", body: { reason } });
       setMessage("Flagged — thanks, an admin will review it.");
     } catch (err: any) {
-      setMessage(err.message);
+      setError(err.message);
     }
   };
 
   return (
     <>
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: "1rem" }}>
-        <h1 style={{ margin: 0 }}>Interview Questions</h1>
-        <button onClick={() => setShowForm((s) => !s)}>{showForm ? "Close form" : "Submit a question"}</button>
-      </div>
+      <PageHeader title="Interview Questions">
+        <FormDialog open={showForm} onOpenChange={setShowForm} title="Submit an interview question"
+                    trigger={<Button>Submit a question</Button>}>
+          <QuestionForm
+            domains={domains}
+            companies={companies}
+            reloadCompanies={reloadCompanies}
+            onDone={(msg) => { setMessage(msg); setShowForm(false); }}
+          />
+        </FormDialog>
+      </PageHeader>
 
-      {showForm && (
-        <QuestionForm
-          domains={domains}
-          companies={companies}
-          reloadCompanies={reloadCompanies}
-          onDone={(msg) => { setMessage(msg); setShowForm(false); }}
-        />
-      )}
-      {message && <p className="success">{message}</p>}
+      <Notice error={error} success={message} />
 
-      <div className="filters">
-        <select value={filters.domain_id} onChange={(e) => setFilter("domain_id", e.target.value)}>
-          <option value="">All domains</option>
-          {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-        <select value={filters.company_id} onChange={(e) => setFilter("company_id", e.target.value)}>
-          <option value="">All companies</option>
-          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select value={filters.difficulty} onChange={(e) => setFilter("difficulty", e.target.value)}>
-          <option value="">Any difficulty</option>
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-        </select>
-        <select value={filters.question_type} onChange={(e) => setFilter("question_type", e.target.value)}>
-          <option value="">Any type</option>
-          <option value="technical">Technical</option>
-          <option value="behavioural">Behavioural</option>
-          <option value="hr">HR</option>
-          <option value="case_study">Case study</option>
-        </select>
-      </div>
+      <Flex gap="2" wrap="wrap" mb="5">
+        <Choice value={filters.domain_id} onChange={setFilter("domain_id")} options={toOpts(domains)} all="All domains" />
+        <Choice value={filters.company_id} onChange={setFilter("company_id")} options={toOpts(companies)} all="All companies" />
+        <Choice value={filters.difficulty} onChange={setFilter("difficulty")} options={DIFFICULTIES} all="Any difficulty" />
+        <Choice value={filters.question_type} onChange={setFilter("question_type")} options={QUESTION_TYPES} all="Any type" />
+      </Flex>
 
-      <h2>Community submissions ({count})</h2>
-      {questions.length === 0 && <p className="muted">No community questions match these filters yet.</p>}
+      <Heading size="5" mb="3">Community submissions ({count})</Heading>
+      {questions.length === 0 && <Empty>No community questions match these filters yet.</Empty>}
       {questions.map((q) => (
-        <div className="card" key={q.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{domainName(q.domain_id)}</span>
-            <span className="badge">{companyName(q.company_id)}</span>
-            <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>
-            <span className="badge">{q.question_type.replace("_", " ")}</span>
-            <span className="muted">{q.role_title} · asked {q.asked_date.slice(0, 7)}</span>
-          </div>
-          <p>{q.question_text}</p>
-          {q.notes && <p className="muted">Notes: {q.notes}</p>}
-          <div className="row mt">
-            <button className="ghost" onClick={() => upvote(q.id)}>▲ {q.upvotes}</button>
-            <button className="ghost" onClick={() => flag(q.id)}>⚑ Flag</button>
-          </div>
-        </div>
+        <Card size="2" key={q.id} mb="3">
+          <Flex gap="2" align="center" wrap="wrap" mb="2">
+            <Tag>{domainName(q.domain_id)}</Tag>
+            <Tag>{companyName(q.company_id)}</Tag>
+            <Tag value={q.difficulty} />
+            <Tag value={q.question_type} />
+            <Text size="1" color="gray">{q.role_title} · asked {q.asked_date.slice(0, 7)}</Text>
+          </Flex>
+          <Text as="p">{q.question_text}</Text>
+          {q.notes && <Text as="p" size="2" color="gray" mt="2">Notes: {q.notes}</Text>}
+          <Flex gap="4" mt="3" ml="1">
+            <Button size="1" variant="ghost" color="gray" onClick={() => upvote(q.id)} aria-label={`Upvote (${q.upvotes})`}>
+              <Icon name="up" size={14} /> {q.upvotes}
+            </Button>
+            <ReasonDialog
+              title="Flag this question"
+              description="Tell the moderators what's wrong (min 5 characters)."
+              minLength={5} confirmLabel="Flag" color="red"
+              onSubmit={(reason) => flag(q.id, reason)}
+              trigger={<Button size="1" variant="ghost" color="gray"><Icon name="flag" size={14} /> Flag</Button>}
+            />
+          </Flex>
+        </Card>
       ))}
-      <Pager page={page} count={count} onPage={setPage} />
+      <Pager page={page} pages={Math.ceil(count / PER_PAGE)} onPage={setPage} />
 
-      <h2 className="mt">From the interview question pool ({bankCount})</h2>
-      {bank.length === 0 && <p className="muted">No pool questions match these filters.</p>}
+      <Heading size="5" mt="6" mb="3">From the interview question pool ({bankCount})</Heading>
+      {bank.length === 0 && <Empty>No pool questions match these filters.</Empty>}
       {bank.map((q) => (
-        <div className="card" key={q.id}>
-          <div className="row" style={{ marginBottom: "0.4rem" }}>
-            <span className="badge">{domainName(q.domain_id)}</span>
-            {q.company_id && <span className="badge">{companyName(q.company_id)}</span>}
-            {q.difficulty && <span className={`badge ${q.difficulty}`}>{q.difficulty}</span>}
-            <span className="badge">{q.question_type.replace("_", " ")}</span>
-            <span className="muted">{q.role_title}</span>
-          </div>
-          <p>{q.question_text}</p>
-        </div>
+        <Card size="2" key={q.id} mb="3">
+          <Flex gap="2" align="center" wrap="wrap" mb="2">
+            <Tag>{domainName(q.domain_id)}</Tag>
+            {q.company_id && <Tag>{companyName(q.company_id)}</Tag>}
+            <Tag value={q.difficulty} />
+            <Tag value={q.question_type} />
+            <Text size="1" color="gray">{q.role_title}</Text>
+          </Flex>
+          <Text as="p">{q.question_text}</Text>
+        </Card>
       ))}
-      <Pager page={bankPage} count={bankCount} onPage={setBankPage} />
+      <Pager page={bankPage} pages={Math.ceil(bankCount / PER_PAGE)} onPage={setBankPage} />
     </>
-  );
-}
-
-function Pager({ page, count, onPage }: { page: number; count: number; onPage: (p: number) => void }) {
-  const pages = Math.ceil(count / PER_PAGE);
-  if (pages <= 1) return null;
-  return (
-    <div className="row">
-      <button className="secondary small" disabled={page === 1} onClick={() => onPage(page - 1)}>Prev</button>
-      <span className="muted">Page {page} of {pages}</span>
-      <button className="secondary small" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
-    </div>
   );
 }
 
@@ -167,16 +151,17 @@ function QuestionForm({ domains, companies, reloadCompanies, onDone }: {
   });
   const [newCompany, setNewCompany] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
-  const set = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof typeof form) => (v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
 
   const addCompany = async () => {
-    setError("");
+    setError(""); setInfo("");
     try {
       await api("/companies/", { method: "POST", body: { name: newCompany } });
       setNewCompany("");
       reloadCompanies();
-      setError("Company submitted — it will appear once an admin approves it.");
+      setInfo("Company submitted — it will appear once an admin approves it.");
     } catch (err: any) {
       setError(err.message);
     }
@@ -205,59 +190,51 @@ function QuestionForm({ domains, companies, reloadCompanies, onDone }: {
   };
 
   return (
-    <div className="card">
-      <h2>Submit an interview question</h2>
-      <form onSubmit={submit}>
-        <label>Domain</label>
-        <select value={form.domain_id} onChange={(e) => set("domain_id", e.target.value)} required>
-          <option value="">Select…</option>
-          {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-        </select>
-        <label>Company</label>
-        <select value={form.company_id} onChange={(e) => set("company_id", e.target.value)} required>
-          <option value="">Select…</option>
-          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <div className="row mt">
-          <input placeholder="Company not listed? Add it" value={newCompany} onChange={(e) => setNewCompany(e.target.value)} style={{ flex: 1 }} />
-          <button type="button" className="secondary" disabled={!newCompany.trim()} onClick={addCompany}>Add company</button>
-        </div>
-        <label>Role / job title</label>
-        <input value={form.role_title} onChange={(e) => set("role_title", e.target.value)} maxLength={100} required placeholder="e.g. Backend Developer Intern" />
-        <label>Question (min 20 characters)</label>
-        <textarea value={form.question_text} onChange={(e) => set("question_text", e.target.value)} minLength={20} required />
-        <div className="row">
-          <div style={{ flex: 1 }}>
-            <label>Type</label>
-            <select value={form.question_type} onChange={(e) => set("question_type", e.target.value)}>
-              <option value="technical">Technical</option>
-              <option value="behavioural">Behavioural</option>
-              <option value="hr">HR</option>
-              <option value="case_study">Case study</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label>Difficulty</label>
-            <select value={form.difficulty} onChange={(e) => set("difficulty", e.target.value)}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-          <div style={{ flex: 1 }}>
-            <label>When asked</label>
-            <input type="month" value={form.asked_month} onChange={(e) => set("asked_month", e.target.value)} required />
-          </div>
-        </div>
-        <label>Notes (optional)</label>
-        <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={500} />
-        <label style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-          <input type="checkbox" style={{ width: "auto" }} checked={form.is_anonymous} onChange={(e) => set("is_anonymous", e.target.checked)} />
-          Submit anonymously
-        </label>
-        {error && <p className="error">{error}</p>}
-        <button className="mt" disabled={busy}>{busy ? "Submitting…" : "Submit for review"}</button>
-      </form>
-    </div>
+    <form onSubmit={submit}>
+      <Flex direction="column" gap="3" mt="3">
+        <Grid columns={{ initial: "1", sm: "2" }} gap="3">
+          <Field label="Domain">
+            <Choice value={form.domain_id} onChange={set("domain_id")} options={toOpts(domains)} required />
+          </Field>
+          <Field label="Company">
+            <Choice value={form.company_id} onChange={set("company_id")} options={toOpts(companies)} required />
+          </Field>
+        </Grid>
+        <Flex gap="2">
+          <TextField.Root style={{ flex: 1 }} placeholder="Company not listed? Add it" aria-label="New company name"
+                          value={newCompany} onChange={(e) => setNewCompany(e.target.value)} />
+          <Button type="button" variant="soft" color="gray" disabled={!newCompany.trim()} onClick={addCompany}>
+            Add company
+          </Button>
+        </Flex>
+        <Notice success={info} />
+        <Field label="Role / job title">
+          <TextField.Root value={form.role_title} onChange={(e) => set("role_title")(e.target.value)}
+                          maxLength={100} required placeholder="e.g. Backend Developer Intern" />
+        </Field>
+        <Field label="Question" hint="At least 20 characters">
+          <TextArea rows={4} value={form.question_text} onChange={(e) => set("question_text")(e.target.value)}
+                    minLength={20} required />
+        </Field>
+        <Grid columns={{ initial: "1", sm: "3" }} gap="3">
+          <Field label="Type">
+            <Choice value={form.question_type} onChange={set("question_type")} options={QUESTION_TYPES} />
+          </Field>
+          <Field label="Difficulty">
+            <Choice value={form.difficulty} onChange={set("difficulty")} options={DIFFICULTIES} />
+          </Field>
+          <Field label="When asked">
+            <TextField.Root type="month" value={form.asked_month}
+                            onChange={(e) => set("asked_month")(e.target.value)} required />
+          </Field>
+        </Grid>
+        <Field label="Notes (optional)">
+          <TextArea value={form.notes} onChange={(e) => set("notes")(e.target.value)} maxLength={500} />
+        </Field>
+        <CheckField checked={form.is_anonymous} onChange={set("is_anonymous")}>Submit anonymously</CheckField>
+        <Notice error={error} />
+        <Flex justify="end"><Button loading={busy}>Submit for review</Button></Flex>
+      </Flex>
+    </form>
   );
 }

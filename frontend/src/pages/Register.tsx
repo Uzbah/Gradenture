@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
-import { Link } from "react-router-dom";
+import { Button, Flex, Strong, Text, TextField } from "@radix-ui/themes";
 import { api } from "../api";
-import Logo from "../components/Logo";
+import { AuthShell, Field, Notice, RLink } from "../components/ui";
 
 export default function Register() {
   const [email, setEmail] = useState("");
@@ -25,37 +25,33 @@ export default function Register() {
 
   if (done)
     return (
-      <div className="page-narrow">
-        <Logo />
-        <div className="card center">
-          <h1>Check your email</h1>
-          <p className="muted">
-            We sent a verification link to <strong>{email}</strong>. Verify your email, then{" "}
-            <Link to="/login">log in</Link>.
-          </p>
-        </div>
-      </div>
+      <AuthShell title="Check your email">
+        <Text as="p" color="gray">
+          We sent a verification link to <Strong>{email}</Strong>. Verify your email, then{" "}
+          <RLink to="/login">log in</RLink>.
+        </Text>
+      </AuthShell>
     );
 
   return (
-    <div className="page-narrow">
-      <Logo />
-      <div className="card">
-        <h1>Create your account</h1>
-        <form onSubmit={submit}>
-          <label>Email</label>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <label>Password (min 8 characters)</label>
-          <input type="password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} required />
-          {error && <p className="error">{error}</p>}
-          <button className="mt" disabled={busy} style={{ width: "100%" }}>
-            {busy ? "Creating…" : "Register"}
-          </button>
-        </form>
-        <p className="muted mt">
-          Already registered? <Link to="/login">Log in</Link>
-        </p>
-      </div>
-    </div>
+    <AuthShell title="Create your account">
+      <form onSubmit={submit}>
+        <Flex direction="column" gap="4">
+          <Field label="Email">
+            <TextField.Root size="3" type="email" autoComplete="email" value={email}
+                            onChange={(e) => setEmail(e.target.value)} required />
+          </Field>
+          <Field label="Password" hint="At least 8 characters">
+            <TextField.Root size="3" type="password" autoComplete="new-password" minLength={8} value={password}
+                            onChange={(e) => setPassword(e.target.value)} required />
+          </Field>
+          <Notice error={error} />
+          <Button size="3" loading={busy}>Register</Button>
+        </Flex>
+      </form>
+      <Text as="p" size="2" color="gray" mt="4">
+        Already registered? <RLink to="/login">Log in</RLink>
+      </Text>
+    </AuthShell>
   );
 }
