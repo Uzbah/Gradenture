@@ -32,6 +32,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+      # First start on Windows bind mounts can take minutes (polling reloader +
+      # heavy imports); failures during start_period don't count, and the first
+      # success marks it healthy right away.
+      start_period: 300s
+      start_interval: 2s
 
   frontend:
     build:
