@@ -62,8 +62,11 @@ def update_application(user: dict, app_id: str, data: ApplicationUpdateSchema) -
     if not _own_or_404(app_id, user["sub"]):
         raise AppError(404, {"error": "Application not found"})
 
-    payload = {k: v for k, v in data.model_dump().items() if v is not None}
-    if "notes" in payload:
+    # exclude_unset, not "drop Nones": an explicit null must clear a deadline.
+    payload = data.model_dump(exclude_unset=True)
+    if not payload:
+        raise AppError(400, {"error": "No changes submitted"})
+    if payload.get("notes"):
         payload["notes"] = clean_text(payload["notes"])
 
     result = (

@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api, BankQuestion, Company, Question, Review } from "../api";
+import { api, BankQuestion, Company, Question, Review, safeUrl } from "../api";
 import { useLookups } from "../lookups";
 
 export default function CompanyProfile() {
@@ -55,8 +55,8 @@ export default function CompanyProfile() {
         </div>
         <div className="row">
           {company.industry && <span className="badge">{company.industry}</span>}
-          {company.website && (
-            <a href={company.website} target="_blank" rel="noreferrer">{company.website}</a>
+          {safeUrl(company.website) && (
+            <a href={safeUrl(company.website)} target="_blank" rel="noreferrer">{company.website}</a>
           )}
         </div>
       </div>

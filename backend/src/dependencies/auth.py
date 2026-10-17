@@ -9,6 +9,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.algorithms import ECAlgorithm
 
+from src.schemas.common import UUIDStr
 from src.services.auth_helpers import get_user_role, is_user_banned
 
 _bearer = HTTPBearer(auto_error=False)
@@ -46,7 +47,7 @@ def _decode_token(token: str) -> dict:
             token,
             os.getenv("SUPABASE_JWT_SECRET"),
             algorithms=["HS256"],
-            options={"verify_aud": False},
+            audience="authenticated",
         )
 
     try:
@@ -68,7 +69,7 @@ def _decode_token(token: str) -> dict:
         token,
         public_key,
         algorithms=["ES256"],
-        options={"verify_aud": False},
+        audience="authenticated",
     )
 
 
@@ -103,6 +104,8 @@ def get_current_user(
         "email":         payload.get("email"),
         "role":          role,
         "user_metadata": payload.get("user_metadata", {}),
+        # How the session was obtained ("password", "recovery", ...); kept across refreshes.
+        "amr":           [a.get("method") for a in payload.get("amr") or [] if isinstance(a, dict)],
         "token":         token,
     }
 
@@ -130,7 +133,7 @@ def is_company_manager(user_id: str, company_id: str) -> bool:
 
 
 def require_company_manager(
-    company_id: str,
+    company_id: UUIDStr,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     """Manager of THIS company, or any platform admin.

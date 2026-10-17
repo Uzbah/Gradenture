@@ -7,7 +7,7 @@ Interview prep and job application platform for university students and fresh gr
 - **Backend:** FastAPI + Python
 - **Frontend:** React 18 + Vite + TypeScript (plain CSS, no UI framework)
 - **Database:** Supabase (Postgres + Auth)
-- **AI:** Gemini 2.0 Flash (resume analyzer)
+- **AI:** Gemini via `google-genai` (resume analyzer; model set by `GEMINI_MODEL`, default `gemini-3.6-flash`)
 
 ## ⚠️ Before anything: Supabase setup
 
@@ -17,7 +17,7 @@ any DB-backed feature works:
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run all migrations in `supabase/migrations/` in filename order (`supabase db push`, or paste into the SQL editor)
 3. Fill in `backend/.env` and `frontend/.env` (keys below)
-4. Auth → URL Configuration: add `http://localhost:5173/reset-password` as a redirect URL
+4. Auth → URL Configuration: add `http://localhost:5173/reset-password` (or `<APP_URL>/reset-password` in prod) as a redirect URL
 5. Create your first super admin — register through the app, then in the SQL editor:
    ```sql
    UPDATE public.users SET role = 'super_admin' WHERE email = 'you@example.com';
@@ -72,8 +72,11 @@ Copy `.env.example` to `.env` and fill in:
 SUPABASE_URL=                # Project Settings → API
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_JWT_SECRET=         # Project Settings → API → JWT
+APP_URL=http://localhost:5173  # frontend origin; password-reset emails link to $APP_URL/reset-password
 SMTP_PASS=                   # Resend API key (optional — emails are skipped until set)
 GEMINI_API_KEY=              # aistudio.google.com (required for resume analyzer)
+GEMINI_MODEL=                # optional, default gemini-3.6-flash
+FORWARDED_ALLOW_IPS=         # optional: reverse-proxy IP(s), so rate limits see real client IPs
 ```
 
 ```powershell
@@ -82,6 +85,7 @@ python main.py
 
 - API: http://localhost:3001/api/v1
 - Swagger UI: http://localhost:3001/docs
+- Offline checks (no server/DB): `python check_validation.py`
 
 ## Frontend setup
 
@@ -110,7 +114,8 @@ cd ..\backend; python main.py   # serves both on :3001
 ```
 
 `frontend/dist` is auto-detected — if present, FastAPI serves it at `/`. No CORS needed in prod
-(`.env.production` sets `VITE_API_BASE_URL=/api/v1`).
+(`frontend/.env.production`, committed, sets `VITE_API_BASE_URL=/api/v1`).
+Set `APP_URL` in `backend/.env` to the public origin so password-reset links land on it.
 
 ## Docker
 
@@ -189,7 +194,7 @@ supabase/migrations/         # SQL migrations (run in filename order)
 | POST | `/api/v1/auth/register` | — | Register |
 | POST | `/api/v1/auth/login` | — | Login |
 | POST | `/api/v1/auth/forgot-password` | — | Send reset email |
-| POST | `/api/v1/auth/reset-password` | JWT | Set new password |
+| POST | `/api/v1/auth/reset-password` | JWT | Set new password (`current_password` required unless using a recovery link) |
 | POST | `/api/v1/auth/refresh` | — | Swap refresh token for a new session |
 | GET | `/api/v1/users/me` | JWT | Current user |
 | GET | `/api/v1/users/me/submissions` | JWT | Own questions + reviews, all statuses |
@@ -197,7 +202,7 @@ supabase/migrations/         # SQL migrations (run in filename order)
 | GET | `/api/v1/domains` | — | List domains |
 | GET | `/api/v1/questions` | — | List approved questions (filters) |
 | POST | `/api/v1/questions` | JWT | Submit question (5/hr) |
-| POST | `/api/v1/questions/:id/upvote` | JWT | Toggle upvote |
+| POST | `/api/v1/questions/:id/upvote` | JWT | Toggle upvote, approved only (60/hr) |
 | PATCH | `/api/v1/questions/:id` | JWT (owner) | Edit + resubmit a `needs_edit` question |
 | POST | `/api/v1/questions/:id/flag` | JWT | Flag question |
 | GET | `/api/v1/reviews` | — | List approved reviews |
@@ -205,7 +210,7 @@ supabase/migrations/         # SQL migrations (run in filename order)
 | PATCH | `/api/v1/reviews/:id` | JWT (owner) | Edit + resubmit a `needs_edit` review |
 | POST | `/api/v1/reviews/:id/flag` | JWT | Flag review |
 | GET | `/api/v1/companies` | — | List approved companies |
-| POST | `/api/v1/companies` | JWT | Submit company (pending) |
+| POST | `/api/v1/companies` | JWT | Submit company (pending, 5/hr) |
 | GET/POST | `/api/v1/applications` | JWT | List / create applications |
 | PATCH/DELETE | `/api/v1/applications/:id` | JWT | Update / delete application |
 | GET | `/api/v1/prep` | JWT | Prep topics + preparedness score |
@@ -217,4 +222,4 @@ supabase/migrations/         # SQL migrations (run in filename order)
 | PATCH | `/api/v1/admin/companies/:id` | Admin | Approve company |
 | GET | `/api/v1/admin/users` | Admin | List users |
 | PATCH | `/api/v1/admin/users/:id/role` | Super admin | Update role |
-| PATCH | `/api/v1/admin/users/:id/suspend` | Admin | Suspend user |
+| PATCH | `/api/v1/admin/users/:id/suspend` | Admin (super admin for admin targets) | Suspend user |

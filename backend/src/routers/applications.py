@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 
 from src.dependencies.auth import get_current_user
 from src.schemas.application_schema import ApplicationSchema, ApplicationUpdateSchema
+from src.schemas.common import UUIDStr
 from src.services import applications_service
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
@@ -21,7 +22,7 @@ def list_applications(
 
 @router.get("/{app_id}")
 def get_application(
-    app_id: str,
+    app_id: UUIDStr,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return applications_service.get_application(user, app_id)
@@ -37,7 +38,7 @@ def create_application(
 
 @router.patch("/{app_id}")
 def update_application(
-    app_id: str,
+    app_id: UUIDStr,
     body: ApplicationUpdateSchema,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
@@ -46,7 +47,7 @@ def update_application(
 
 @router.delete("/{app_id}")
 def delete_application(
-    app_id: str,
+    app_id: UUIDStr,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return applications_service.delete_application(user, app_id)

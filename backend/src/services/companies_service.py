@@ -3,6 +3,7 @@ import re
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.company_schema import CompanyEditRequestSchema, CompanySchema
+from src.utils.sanitize import clean_text
 
 
 def _slug(name: str) -> str:
@@ -38,23 +39,29 @@ def get_company(company_id: str) -> dict:
     return {"data": row}
 
 
-def submit_company(data: CompanySchema) -> dict:
-    name = data.name.strip()
-    if not name:
-        raise AppError(400, {"errors": {"name": ["must not be empty"]}})
-
-    existing = maybe_row(
-        supabase.table("companies").select("id").ilike("name", name)
+def company_exists(name: str) -> bool:
+    """Case-insensitive duplicate check on the slug, not ilike on the name:
+    ilike treats % and _ as wildcards and 500s on multiple matches."""
+    return bool(
+        supabase.table("companies").select("id").eq("slug", _slug(name)).limit(1).execute().data
     )
-    if existing:
+
+
+def submit_company(user: dict, data: CompanySchema) -> dict:
+    name = clean_text(data.name).strip()
+    if not name or len(name) > 100:
+        raise AppError(400, {"errors": {"name": ["must be 1-100 characters"]}})
+
+    if company_exists(name):
         raise AppError(409, {"error": "Company already exists"})
 
     result = supabase.table("companies").insert({
-        "name":     name,
-        "slug":     _slug(name),
-        "website":  data.website,
-        "industry": data.industry,
-        "status":   "pending",
+        "name":         name,
+        "slug":         _slug(name),
+        "website":      data.website,
+        "industry":     clean_text(data.industry) if data.industry else None,
+        "status":       "pending",
+        "submitted_by": user["sub"],
     }).execute()
 
     return {

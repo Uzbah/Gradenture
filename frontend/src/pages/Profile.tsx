@@ -229,6 +229,7 @@ function ProfileForm() {
 }
 
 function PasswordForm() {
+  const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
@@ -239,8 +240,10 @@ function PasswordForm() {
     setError(""); setMessage("");
     if (password !== confirm) return setError("Passwords don't match.");
     try {
-      await api("/auth/reset-password", { method: "POST", body: { password } });
-      setPassword(""); setConfirm("");
+      await api("/auth/reset-password", {
+        method: "POST", body: { password, current_password: current },
+      });
+      setCurrent(""); setPassword(""); setConfirm("");
       setMessage("Password updated.");
     } catch (err: any) {
       setError(err.message);
@@ -250,6 +253,9 @@ function PasswordForm() {
   return (
     <div className="card" style={{ maxWidth: 520 }}>
       <form onSubmit={submit}>
+        <label>Current password</label>
+        <input type="password" autoComplete="current-password" value={current}
+               onChange={(e) => setCurrent(e.target.value)} required />
         <label>New password (min 8 characters)</label>
         <input type="password" minLength={8} maxLength={128} value={password}
                onChange={(e) => setPassword(e.target.value)} required />

@@ -19,6 +19,7 @@ One file per route; forms are inlined as local components in the same file. Patt
 | `Applications.tsx` | `/applications` | JWT | 5-column kanban, move via `<select>`, delete |
 | `Prep.tsx` | `/prep` | JWT | topic checklist + `ProgressRing` (exported, reused by Dashboard) |
 | `Resume.tsx` | `/resume` | JWT | multipart upload → `/resume/analyze` |
-| `Admin.tsx` | `/admin` | admin (API-enforced) | tabs: queue (questions/reviews/companies/profile edits), flags, companies (CRUD/merge/managers), users (role = super_admin only, suspend) |
+| `Profile.tsx` | `/profile` | JWT | My submissions + resubmit, profile details (`/users/onboarding`), password change (needs current password) |
+| `Admin.tsx` | `/admin` | admin (API-enforced) | tabs: queue (questions/reviews/companies/profile edits), flags, companies (CRUD/merge/managers), users (role = super_admin only; suspend — plain admins only see it on plain users) |
 
-Flag reasons and moderation notes use `window.prompt`. `website` / `job_url` are rendered as `<a href target="_blank" rel="noreferrer">`.
+Flag reasons and moderation notes use `window.prompt`. `website` / `job_url` are rendered as `<a href={safeUrl(...)} target="_blank" rel="noreferrer">` — never put a raw user URL in an `href`.

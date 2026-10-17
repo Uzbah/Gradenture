@@ -3,13 +3,14 @@ from src.dependencies.exceptions import AppError
 from src.schemas.question_schema import FlagSchema
 from src.schemas.review_schema import ReviewEditSchema, ReviewSchema
 from src.services import email_service
+from src.services.questions_service import flag_content
 from src.utils.sanitize import clean_text
 
-
-def _sanitize(r: dict, is_admin: bool = False) -> dict:
-    if not is_admin and r.get("is_anonymous"):
-        r.pop("submitted_by", None)
-    return r
+# Whitelist, not "*" — see questions_service.PUBLIC_COLUMNS.
+PUBLIC_COLUMNS = (
+    "id, company_id, domain_id, role_title, review_text, interview_date, "
+    "difficulty, outcome, created_at"
+)
 
 
 def list_reviews(
@@ -24,7 +25,7 @@ def list_reviews(
 
     query = (
         supabase.table("interview_reviews")
-        .select("*", count="exact")
+        .select(PUBLIC_COLUMNS, count="exact")
         .eq("status", "approved")
         .order("created_at", desc=True)
     )
@@ -34,19 +35,19 @@ def list_reviews(
             query = query.eq(field, val)
 
     result = query.range(offset, offset + limit - 1).execute()
-    return {"data": [_sanitize(r) for r in result.data], "count": result.count}
+    return {"data": result.data, "count": result.count}
 
 
 def get_review(review_id: str) -> dict:
     row = maybe_row(
         supabase.table("interview_reviews")
-        .select("*")
+        .select(PUBLIC_COLUMNS)
         .eq("id", review_id)
         .eq("status", "approved")
     )
     if not row:
         raise AppError(404, {"error": "Review not found"})
-    return {"data": _sanitize(row)}
+    return {"data": row}
 
 
 def submit_review(user: dict, data: ReviewSchema) -> dict:
@@ -95,10 +96,4 @@ def resubmit_review(user: dict, review_id: str, data: ReviewEditSchema) -> dict:
 
 
 def flag_review(user: dict, review_id: str, data: FlagSchema) -> dict:
-    supabase.table("content_flags").insert({
-        "reported_by":  user["sub"],
-        "content_type": "review",
-        "content_id":   review_id,
-        "reason":       data.reason,
-    }).execute()
-    return {"message": "Flagged for review"}
+    return flag_content(user, "review", review_id, data)

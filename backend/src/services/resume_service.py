@@ -3,33 +3,38 @@ import json
 import logging
 import os
 
-import google.generativeai as genai
 import pdfplumber
 from docx import Document
+from google import genai
+from google.genai import types
 
 from src.dependencies.exceptions import AppError
 
 logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+MAX_JD_CHARS = 10_000
 
 ALLOWED_TYPES = {
     "application/pdf": "pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
 }
 
-_model = None
+# gemini-2.0-flash was shut down on 2026-06-01; Google lists gemini-3.6-flash as
+# its replacement. Model ids churn, so it is overridable without a deploy.
+DEFAULT_MODEL = "gemini-3.6-flash"
+
+_client: genai.Client | None = None
 
 
-def _get_model() -> genai.GenerativeModel:
-    global _model
-    if _model is None:
+def _get_client() -> genai.Client:
+    global _client
+    if _client is None:
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
             raise AppError(500, {"error": "AI service not configured"})
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-2.0-flash")
-    return _model
+        _client = genai.Client(api_key=api_key)
+    return _client
 
 
 def _extract_text(content: bytes, content_type: str) -> str:
@@ -37,12 +42,16 @@ def _extract_text(content: bytes, content_type: str) -> str:
     if not file_type:
         raise AppError(400, {"error": "Only PDF and DOCX files are supported"})
 
-    if file_type == "pdf":
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
-    else:
-        doc = Document(io.BytesIO(content))
-        text = "\n".join(p.text for p in doc.paragraphs)
+    try:
+        if file_type == "pdf":
+            with pdfplumber.open(io.BytesIO(content)) as pdf:
+                text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        else:
+            doc = Document(io.BytesIO(content))
+            text = "\n".join(p.text for p in doc.paragraphs)
+    except Exception:
+        # content_type is client-supplied; a renamed or corrupt file lands here.
+        raise AppError(400, {"error": "Could not read the file. Upload a valid PDF or DOCX."})
 
     text = text.strip()
     if not text:
@@ -86,16 +95,19 @@ def analyze(content: bytes, content_type: str, job_description: str | None) -> d
     if len(content) > MAX_FILE_SIZE:
         raise AppError(413, {"error": "File exceeds 5MB limit"})
 
+    if job_description and len(job_description) > MAX_JD_CHARS:
+        raise AppError(400, {"errors": {"job_description": [f"must be at most {MAX_JD_CHARS} characters"]}})
+
     resume_text = _extract_text(content, content_type)
     prompt = _build_prompt(resume_text, job_description)
 
     try:
-        model = _get_model()
-        response = model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"},
+        response = _get_client().models.generate_content(
+            model=os.environ.get("GEMINI_MODEL", DEFAULT_MODEL),
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json"),
         )
-        result = json.loads(response.text)
+        result = json.loads(response.text or "")
     except AppError:
         raise
     except Exception:

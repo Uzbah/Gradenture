@@ -69,77 +69,94 @@ def get_queue() -> dict:
     return {"data": {"questions": questions, "reviews": reviews, "companies": companies}}
 
 
-def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dict:
-    q = maybe_row(
-        supabase.table("interview_questions")
-        .select("submitted_by, question_text")
-        .eq("id", question_id)
+def _moderate(
+    user: dict, kind: str, table: str, text_col: str, item_id: str, data: ModerateSchema
+) -> dict:
+    """pending -> approved | rejected | needs_edit, and only from pending.
+
+    Re-moderating a decided item (rejected -> approved, approved -> needs_edit)
+    would bypass the lifecycle and re-send the decision email.
+    """
+    item = maybe_row(
+        supabase.table(table).select(f"submitted_by, status, {text_col}").eq("id", item_id)
     )
-    if not q:
-        raise AppError(404, {"error": "Question not found"})
+    if not item:
+        raise AppError(404, {"error": f"{kind.capitalize()} not found"})
+    if item["status"] != "pending":
+        raise AppError(409, {"error": f"Only pending {kind}s can be moderated (this one is {item['status']})"})
 
     admin_note = clean_text(data.admin_note or "")
 
-    supabase.table("interview_questions").update({
-        "status":      data.status,
-        "admin_note":  admin_note or None,
-        "reviewed_by": user["sub"],
-        "reviewed_at": "now()",
-    }).eq("id", question_id).execute()
-
-    _audit(user["sub"], f"question_{data.status}", "question", question_id,
-           {"note": admin_note or None})
-    email_service.send_moderation_decision(
-        _email_of(q["submitted_by"]), "question", q["question_text"], data.status, admin_note
+    result = (
+        supabase.table(table).update({
+            "status":      data.status,
+            "admin_note":  admin_note or None,
+            "reviewed_by": user["sub"],
+            "reviewed_at": "now()",
+        })
+        .eq("id", item_id)
+        .eq("status", "pending")   # another admin decided it in the meantime
+        .execute()
     )
-    return {"message": f"Question {data.status}"}
+    if not result.data:
+        raise AppError(409, {"error": f"This {kind} was already moderated"})
+
+    # ponytail: update and audit are two calls, not one transaction; an audit
+    # failure 500s loudly after the change. Move both into one RPC if that bites.
+    _audit(user["sub"], f"{kind}_{data.status}", kind, item_id, {"note": admin_note or None})
+    email_service.send_moderation_decision(
+        _email_of(item["submitted_by"]), kind, item[text_col], data.status, admin_note
+    )
+    return {"message": f"{kind.capitalize()} {data.status}"}
+
+
+def moderate_question(user: dict, question_id: str, data: ModerateSchema) -> dict:
+    return _moderate(user, "question", "interview_questions", "question_text", question_id, data)
 
 
 def moderate_review(user: dict, review_id: str, data: ModerateSchema) -> dict:
-    r = maybe_row(
-        supabase.table("interview_reviews")
-        .select("submitted_by, review_text")
-        .eq("id", review_id)
-    )
-    if not r:
-        raise AppError(404, {"error": "Review not found"})
-
-    admin_note = clean_text(data.admin_note or "")
-
-    supabase.table("interview_reviews").update({
-        "status":      data.status,
-        "admin_note":  admin_note or None,
-        "reviewed_by": user["sub"],
-        "reviewed_at": "now()",
-    }).eq("id", review_id).execute()
-
-    _audit(user["sub"], f"review_{data.status}", "review", review_id,
-           {"note": admin_note or None})
-    email_service.send_moderation_decision(
-        _email_of(r["submitted_by"]), "review", r["review_text"], data.status, admin_note
-    )
-    return {"message": f"Review {data.status}"}
+    return _moderate(user, "review", "interview_reviews", "review_text", review_id, data)
 
 
 def moderate_company(
     user: dict, company_id: str, data: CompanyUpdateSchema | None = None
 ) -> dict:
+    before = maybe_row(
+        supabase.table("companies").select("status, submitted_by").eq("id", company_id)
+    )
+    if not before:
+        raise AppError(404, {"error": "Company not found"})
+
     fields = data.model_dump(exclude_none=True) if data else {}
     # An empty body still just approves, keeping the queue's behaviour.
     fields.setdefault("status", "approved")
     if "name" in fields:
-        fields["name"] = fields["name"].strip()
-        fields["slug"] = _slug(fields["name"])
+        _check_new_name(fields, company_id)
 
     result = (
         supabase.table("companies").update(fields).eq("id", company_id).execute()
     )
-    if not result.data:
-        raise AppError(404, {"error": "Company not found"})
+    company = result.data[0]
 
     action = "company_updated" if len(fields) > 1 else "company_approved"
     _audit(user["sub"], action, "company", company_id, fields)
-    return {"message": "Company updated", "data": result.data[0]}
+    if before["status"] == "pending" and company["status"] == "approved":
+        email_service.send_company_approved(_email_of(before.get("submitted_by")), company["name"])
+    return {"message": "Company updated", "data": company}
+
+
+def _check_new_name(fields: dict, company_id: str | None = None) -> None:
+    """Normalise a renamed company and refuse a slug another company holds
+    (the UNIQUE constraint would otherwise surface as a 500)."""
+    fields["name"] = clean_text(fields["name"]).strip()
+    if not fields["name"] or len(fields["name"]) > 100:
+        raise AppError(400, {"errors": {"name": ["must be 1-100 characters"]}})
+    fields["slug"] = _slug(fields["name"])
+    clash = (
+        supabase.table("companies").select("id").eq("slug", fields["slug"]).limit(1).execute().data
+    )
+    if clash and clash[0]["id"] != company_id:
+        raise AppError(409, {"error": "Another company already has that name"})
 
 
 def list_companies(
@@ -161,16 +178,12 @@ def list_companies(
 
 
 def create_company(user: dict, data: CompanyAdminCreateSchema) -> dict:
-    name = data.name.strip()
-    if not name:
-        raise AppError(400, {"errors": {"name": ["must not be empty"]}})
-    if maybe_row(supabase.table("companies").select("id").ilike("name", name)):
-        raise AppError(409, {"error": "Company already exists"})
+    fields = data.model_dump(exclude_none=True)
+    _check_new_name(fields)
+    name = fields["name"]
 
     result = supabase.table("companies").insert({
-        **data.model_dump(exclude_none=True),
-        "name":   name,
-        "slug":   _slug(name),
+        **fields,
         "status": "approved",   # admin-created companies skip the queue
     }).execute()
 
@@ -262,9 +275,18 @@ def list_users(page: int = 1, limit: int = 20) -> dict:
     return {"data": result.data, "count": result.count}
 
 
-def _require_user(user_id: str) -> None:
-    if not maybe_row(supabase.table("users").select("id").eq("id", user_id)):
+def _require_user(user_id: str) -> dict:
+    row = maybe_row(supabase.table("users").select("id, role").eq("id", user_id))
+    if not row:
         raise AppError(404, {"error": "User not found"})
+    return row
+
+
+def _require_can_discipline(actor: dict, target: dict) -> None:
+    """Plain admins may only act on plain users. Otherwise an admin could ban
+    every super admin and leave nobody able to manage roles."""
+    if target["role"] != "user" and actor["role"] != "super_admin":
+        raise AppError(403, {"error": "Only a super admin can do this to an admin"})
 
 
 def update_user_role(actor: dict, user_id: str, data: UpdateRoleSchema) -> dict:
@@ -283,7 +305,7 @@ def update_user_role(actor: dict, user_id: str, data: UpdateRoleSchema) -> dict:
 
 
 def warn_user(actor: dict, user_id: str) -> dict:
-    _require_user(user_id)
+    _require_can_discipline(actor, _require_user(user_id))
     _audit(actor["sub"], "user_warned", "user", user_id)
     email_service.send_warn(_email_of(user_id))
     return {"message": "Warning recorded"}
@@ -293,7 +315,7 @@ def suspend_user(actor: dict, user_id: str) -> dict:
     if user_id == actor["sub"]:
         raise AppError(400, {"error": "You cannot suspend yourself"})
 
-    _require_user(user_id)
+    _require_can_discipline(actor, _require_user(user_id))
     supabase.auth.admin.update_user_by_id(user_id, {"ban_duration": "876600h"})
     # ponytail: display mirror — auth.users stays the source of truth for login blocking.
     supabase.table("users").update({"suspended_at": "now()"}).eq("id", user_id).execute()
@@ -305,7 +327,7 @@ def suspend_user(actor: dict, user_id: str) -> dict:
 
 
 def unsuspend_user(actor: dict, user_id: str) -> dict:
-    _require_user(user_id)
+    _require_can_discipline(actor, _require_user(user_id))
     supabase.auth.admin.update_user_by_id(user_id, {"ban_duration": "none"})
     supabase.table("users").update({"suspended_at": None}).eq("id", user_id).execute()
     invalidate_ban_cache(user_id)
@@ -330,8 +352,10 @@ def grant_manager(user: dict, company_id: str, data: CompanyManagerGrantSchema) 
     if not maybe_row(supabase.table("companies").select("id").eq("id", company_id)):
         raise AppError(404, {"error": "Company not found"})
 
+    # eq, not ilike: "_" is an ilike wildcard, so john_doe@ matched john.doe@.
+    # Emails are stored lowercased at registration.
     target = maybe_row(
-        supabase.table("users").select("id, email").ilike("email", data.email.strip())
+        supabase.table("users").select("id, email").eq("email", data.email.strip().lower())
     )
     if not target:
         raise AppError(404, {"error": "No user with that email"})
@@ -399,8 +423,7 @@ def decide_company_edit(
     if data.status == "approved":
         changes = dict(req["changes"])
         if "name" in changes:
-            changes["name"] = changes["name"].strip()
-            changes["slug"] = _slug(changes["name"])
+            _check_new_name(changes, req["company_id"])
         supabase.table("companies").update(changes).eq("id", req["company_id"]).execute()
 
     admin_note = clean_text(data.admin_note or "") or None

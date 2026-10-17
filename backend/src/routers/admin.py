@@ -11,6 +11,7 @@ from src.schemas.company_schema import (
     CompanyMergeSchema,
     CompanyUpdateSchema,
 )
+from src.schemas.common import UUIDStr
 from src.services import admin_service
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -23,7 +24,7 @@ def get_queue(_user: Annotated[dict, Depends(require_admin)]) -> dict:
 
 @router.patch("/questions/{question_id}")
 def moderate_question(
-    question_id: str,
+    question_id: UUIDStr,
     body: ModerateSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
@@ -32,7 +33,7 @@ def moderate_question(
 
 @router.patch("/reviews/{review_id}")
 def moderate_review(
-    review_id: str,
+    review_id: UUIDStr,
     body: ModerateSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
@@ -60,7 +61,7 @@ def create_company(
 
 @router.patch("/companies/{company_id}")
 def moderate_company(
-    company_id: str,
+    company_id: UUIDStr,
     user: Annotated[dict, Depends(require_admin)],
     body: CompanyUpdateSchema | None = None,
 ) -> dict:
@@ -69,7 +70,7 @@ def moderate_company(
 
 @router.post("/companies/{company_id}/merge")
 def merge_companies(
-    company_id: str,
+    company_id: UUIDStr,
     body: CompanyMergeSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
@@ -83,7 +84,7 @@ def list_flags(_user: Annotated[dict, Depends(require_admin)]) -> dict:
 
 @router.patch("/flags/{flag_id}")
 def resolve_flag(
-    flag_id: str,
+    flag_id: UUIDStr,
     body: FlagActionSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
@@ -101,7 +102,7 @@ def list_users(
 
 @router.patch("/users/{user_id}/role")
 def update_user_role(
-    user_id: str,
+    user_id: UUIDStr,
     body: UpdateRoleSchema,
     user: Annotated[dict, Depends(require_super_admin)],
 ) -> dict:
@@ -110,7 +111,7 @@ def update_user_role(
 
 @router.patch("/users/{user_id}/warn")
 def warn_user(
-    user_id: str,
+    user_id: UUIDStr,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.warn_user(user, user_id)
@@ -118,7 +119,7 @@ def warn_user(
 
 @router.patch("/users/{user_id}/suspend")
 def suspend_user(
-    user_id: str,
+    user_id: UUIDStr,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.suspend_user(user, user_id)
@@ -126,7 +127,7 @@ def suspend_user(
 
 @router.patch("/users/{user_id}/unsuspend")
 def unsuspend_user(
-    user_id: str,
+    user_id: UUIDStr,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.unsuspend_user(user, user_id)
@@ -134,7 +135,7 @@ def unsuspend_user(
 
 @router.get("/companies/{company_id}/managers")
 def list_managers(
-    company_id: str,
+    company_id: UUIDStr,
     _user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.list_managers(company_id)
@@ -142,7 +143,7 @@ def list_managers(
 
 @router.post("/companies/{company_id}/managers", status_code=201)
 def grant_manager(
-    company_id: str,
+    company_id: UUIDStr,
     body: CompanyManagerGrantSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
@@ -151,8 +152,8 @@ def grant_manager(
 
 @router.delete("/companies/{company_id}/managers/{user_id}")
 def revoke_manager(
-    company_id: str,
-    user_id: str,
+    company_id: UUIDStr,
+    user_id: UUIDStr,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:
     return admin_service.revoke_manager(user, company_id, user_id)
@@ -165,7 +166,7 @@ def list_company_edits(_user: Annotated[dict, Depends(require_admin)]) -> dict:
 
 @router.patch("/company-edits/{request_id}")
 def decide_company_edit(
-    request_id: str,
+    request_id: UUIDStr,
     body: CompanyEditDecisionSchema,
     user: Annotated[dict, Depends(require_admin)],
 ) -> dict:

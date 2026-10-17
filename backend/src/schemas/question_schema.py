@@ -1,16 +1,17 @@
-import re
 from typing import Literal, Optional
 from pydantic import BaseModel, field_validator
 
+from src.schemas.common import MonthStr, UUIDStr
+
 
 class QuestionSchema(BaseModel):
-    domain_id:     str
-    company_id:    str
+    domain_id:     UUIDStr
+    company_id:    UUIDStr
     role_title:    str
     question_text: str
     question_type: Literal["technical", "behavioural", "hr", "case_study"]
     difficulty:    Literal["easy", "medium", "hard"]
-    asked_date:    str
+    asked_date:    MonthStr
     notes:         Optional[str] = None
     is_anonymous:  bool = False
 
@@ -21,11 +22,11 @@ class QuestionSchema(BaseModel):
             raise ValueError("must be at least 20 characters")
         return v
 
-    @field_validator("asked_date")
+    @field_validator("notes")
     @classmethod
-    def validate_asked_date(cls, v: str) -> str:
-        if not re.match(r"^\d{4}-\d{2}-01$", v):
-            raise ValueError("must be YYYY-MM-01")
+    def validate_notes(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and len(v) > 500:
+            raise ValueError("must be at most 500 characters")
         return v
 
     @field_validator("role_title")
@@ -65,4 +66,6 @@ class FlagSchema(BaseModel):
     def validate_reason(cls, v: str) -> str:
         if len(v.strip()) < 5:
             raise ValueError("must be at least 5 characters")
+        if len(v.strip()) > 500:
+            raise ValueError("must be at most 500 characters")
         return v.strip()

@@ -90,6 +90,13 @@ export async function api<T = any>(
   return json as T;
 }
 
+// For user-supplied links rendered as <a href>. The API now only accepts
+// http(s), but rows saved before that may hold javascript: URLs, which
+// React 18 still renders (and runs on click).
+export function safeUrl(url?: string | null): string | undefined {
+  return url && /^https?:\/\//i.test(url) ? url : undefined;
+}
+
 // --- shared types matching the backend ---
 export interface Domain { id: string; name: string; slug: string }
 export interface Company {

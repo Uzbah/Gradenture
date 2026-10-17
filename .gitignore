@@ -2,6 +2,8 @@
 .env
 .env.local
 .env.production
+# ...except the frontend's: it holds no secrets (see the file)
+!frontend/.env.production
 
 # Dependencies
 node_modules/

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Request
 from src.dependencies.auth import get_current_user
 from src.dependencies.rate_limit import limiter, user_rate_key
 from src.schemas.question_schema import FlagSchema, QuestionEditSchema, QuestionSchema
+from src.schemas.common import UUIDStr
 from src.services import questions_service
 
 router = APIRouter(prefix="/questions", tags=["Questions"])
@@ -14,8 +15,8 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
 def list_questions(
     page: int = 1,
     limit: int = 20,
-    domain_id: str | None = None,
-    company_id: str | None = None,
+    domain_id: UUIDStr | None = None,
+    company_id: UUIDStr | None = None,
     difficulty: str | None = None,
     question_type: str | None = None,
 ) -> dict:
@@ -25,7 +26,7 @@ def list_questions(
 
 
 @router.get("/{question_id}")
-def get_question(question_id: str) -> dict:
+def get_question(question_id: UUIDStr) -> dict:
     return questions_service.get_question(question_id)
 
 
@@ -43,7 +44,7 @@ def submit_question(
 @limiter.limit("10/hour", key_func=user_rate_key)
 def resubmit_question(
     request: Request,
-    question_id: str,
+    question_id: UUIDStr,
     body: QuestionEditSchema,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
@@ -51,8 +52,10 @@ def resubmit_question(
 
 
 @router.post("/{question_id}/upvote")
+@limiter.limit("60/hour", key_func=user_rate_key)
 def upvote_question(
-    question_id: str,
+    request: Request,
+    question_id: UUIDStr,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
     return questions_service.upvote_question(user, question_id)
@@ -62,7 +65,7 @@ def upvote_question(
 @limiter.limit("10/hour", key_func=user_rate_key)
 def flag_question(
     request: Request,
-    question_id: str,
+    question_id: UUIDStr,
     body: FlagSchema,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:

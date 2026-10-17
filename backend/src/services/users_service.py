@@ -1,8 +1,7 @@
-import bleach
-
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.user import OnboardingSchema
+from src.utils.sanitize import clean_text
 
 
 def get_me(user: dict) -> dict:
@@ -48,7 +47,8 @@ def get_domains() -> dict:
 
 
 def complete_onboarding(user: dict, data: OnboardingSchema) -> dict:
-    clean_university = bleach.clean(data.university, tags=[], strip=True)
+    # bleach escaped "&" to "&amp;" here, so "Texas A&M" was stored mangled.
+    clean_university = clean_text(data.university)
 
     supabase.table("users").upsert({
         "id":                  user["sub"],

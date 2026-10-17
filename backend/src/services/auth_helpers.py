@@ -52,21 +52,19 @@ def is_user_banned(user_id: str) -> bool:
 
 
 def _check_banned_from_auth(user_id: str) -> bool:
-    try:
-        resp = supabase.auth.admin.get_user_by_id(user_id)
-        banned_until = getattr(resp.user, "banned_until", None)
-        if not banned_until:
-            return False
-        if isinstance(banned_until, str):
-            dt = datetime.fromisoformat(banned_until.replace("Z", "+00:00"))
-        else:
-            dt = banned_until
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt > datetime.now(timezone.utc)
-    except Exception as e:
-        logger.warning("Ban check failed for %s: %s", user_id, e)
+    # Fails closed: an auth API error propagates (→ 500, logged, not cached)
+    # rather than letting a banned user through while Supabase Auth is flaky.
+    resp = supabase.auth.admin.get_user_by_id(user_id)
+    banned_until = getattr(resp.user, "banned_until", None)
+    if not banned_until:
         return False
+    if isinstance(banned_until, str):
+        dt = datetime.fromisoformat(banned_until.replace("Z", "+00:00"))
+    else:
+        dt = banned_until
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt > datetime.now(timezone.utc)
 
 
 def invalidate_ban_cache(user_id: str) -> None:

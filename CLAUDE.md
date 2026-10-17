@@ -21,9 +21,9 @@ Monorepo for Gradenture: interview prep + job-application tracker for students i
 ## Invariants (never break)
 
 - Nothing user-submitted is public until an admin approves it (`pending → approved | rejected | needs_edit`).
-- The backend uses the Supabase **service-role** key, so RLS is bypassed for API calls; every authorization check lives in `backend/src`. The RLS policies still matter the day a browser client (supabase-js / anon key) is introduced.
+- The backend uses the Supabase **service-role** key, so RLS is bypassed for API calls; every authorization check lives in `backend/src`. RLS still matters because the anon key is public by design: client policies are read-only (see `supabase/migrations/CLAUDE.md`).
 - Secrets only in `backend/.env` / `frontend/.env` (gitignored, dockerignored). Never commit them.
 
 ## Status
 
-The original Supabase project was deleted; a new one must be created and the migrations applied before anything DB-backed works (see README). No automated test suite yet; three smoke scripts in `backend/` run against a live dev server.
+The original Supabase project was deleted; a new one must be created and the migrations applied before anything DB-backed works (see README). No pytest suite yet: `backend/check_validation.py` runs offline, and four smoke scripts in `backend/` run against a live dev server.

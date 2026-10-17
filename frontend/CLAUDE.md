@@ -16,7 +16,7 @@ src/
 ├── api.ts              # fetch wrapper (Bearer token, error extraction,
 │                       #   auto-logout on 401) + shared TS types
 ├── auth.tsx            # AuthProvider / useAuth (user, login, logout, refresh)
-├── lookups.ts          # useLookups(): domains + companies id→name maps
+├── lookups.ts          # useLookups(): domains + companies id→name maps (whole registry, session-cached)
 ├── index.css           # All styling (CSS variables, .card/.badge/.kanban etc.)
 └── pages/              # One file per route, forms inlined in the page
 ```
@@ -31,7 +31,11 @@ flattened by `api.ts`); optimistic updates then reconcile from the response.
 
 Run: `npm install`, `npm run dev` (5173). Build: `npm run build`
 (`tsc -b && vite build`) — output `dist/` is served by the backend in prod
-(`.env.production` sets `VITE_API_BASE_URL=/api/v1`).
+(`.env.production` — committed, no secrets — sets `VITE_API_BASE_URL=/api/v1`, overriding
+the dev URL in `.env`).
+
+User-supplied links (`website`, `job_url`) go through `safeUrl()` in `api.ts`
+before landing in an `href` (http/https only; the API enforces the same).
 
 ## ⚠️ SETUP REQUIRED
 
@@ -63,9 +67,9 @@ role-gated).
 
 ## Remaining / known gaps
 
-- **Company select is capped at 50** (`lookups.ts`, `ponytail:` comment) —
-  the submission forms still use a plain <select>; `/companies` has server-side
-  search (`?q=`) that these could reuse via MUI Autocomplete.
+- **Company selects are plain `<select>`s over the whole registry** (`lookups.ts`
+  pages through `/companies` 50 at a time, cached per session; `ponytail:` comment).
+  Switch to server-side search (`/companies?q=`) once the registry hits a few hundred.
 - **Profile has no name/avatar** (PRD 5.1.3) — the users table has neither;
   avatars need Supabase Storage.
 - **Admin gaps mirror the backend**: no analytics dashboard, no suspend-

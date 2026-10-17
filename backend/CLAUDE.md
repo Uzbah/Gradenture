@@ -12,10 +12,11 @@ main.py                 # FastAPI app, CORS, exception handlers, static mount
 src/
 ├── routers/            # HTTP routes (thin — delegate to services)
 ├── services/           # Business logic + Supabase queries
-├── schemas/            # Pydantic request models
+├── schemas/            # Pydantic request models (common.py: UUIDStr, HttpUrlStr, DateStr, MonthStr)
 ├── dependencies/       # auth.py (JWT), rate_limit.py, exceptions.py
 ├── config/supabase.py  # Supabase client (service role key)
-└── utils/sanitize.py   # bleach wrapper
+└── utils/sanitize.py   # clean_text(): strips control chars (no HTML stripping)
+check_validation.py     # offline checks (no server/DB): python check_validation.py
 scripts/
 ├── ingest_questions.py # CSV → question_bank importer (dry run by default; --commit --actor <admin email>)
 ├── send_deadline_reminders.py # T-7 / T-1 application deadline emails; schedule once a day
@@ -42,11 +43,18 @@ The original Supabase project (`bbwoasmiqxuasjokmrpe.supabase.co`) was **deleted
    - `..._admin_audit_log.sql` — audit log + `users.suspended_at`
    - `..._company_admins.sql` — company managers + profile edit requests
    - `..._question_bank.sql` — curated `question_bank` + UI/UX and QA domains
-4. Supabase Auth → URL Configuration: add `http://localhost:5173/reset-password`
-   as a redirect URL (password recovery)
+   - `20261017..._rls_lockdown.sql` — clients read-only; drops old upvote RPCs
+   - `20261017..._toggle_upvote.sql` — atomic `toggle_upvote(qid, uid)` RPC
+   - `20261017..._integrity_and_indexes.sql` — one open flag per user, deletable
+     users, `companies.submitted_by`, list indexes
+4. Supabase Auth → URL Configuration: add `<APP_URL>/reset-password`
+   (dev: `http://localhost:5173/reset-password`) as a redirect URL. Forgot-password
+   emails send `redirect_to` there; set `APP_URL` in `.env` for other hosts.
 5. Optional keys in `.env`:
    - `SMTP_PASS` — Resend API key (email notifications; currently unused, see below)
    - `GEMINI_API_KEY` — aistudio.google.com (required for `/resume/analyze`)
+   - `GEMINI_MODEL` — defaults to `gemini-3.6-flash` (2.0 Flash was shut down 2026-06-01)
+   - `FORWARDED_ALLOW_IPS` — proxy IP(s) behind a reverse proxy, so rate limits see real client IPs
 6. First super admin: register a user, then in SQL editor:
    `UPDATE public.users SET role = 'super_admin' WHERE email = '...';`
    and mirror it: `select auth.uid()` metadata via
@@ -63,7 +71,7 @@ session refresh), onboarding (also the profile update), `GET /users/me/submissio
 owner resubmit `PATCH /questions/:id` when `needs_edit`), reviews (same resubmit), companies (user-submitted,
 admin-approved), applications tracker, prep roadmaps + preparedness score
 (`/prep`), curated question bank (`GET /prep/questions`, filters +
-full-text `q`; filled by `scripts/ingest_questions.py`), AI resume analyzer (Gemini 2.0 Flash), admin moderation queue,
+full-text `q`; filled by `scripts/ingest_questions.py`), AI resume analyzer (`google-genai`, `GEMINI_MODEL`), admin moderation queue,
 user/role management, rate limiting, JWT verification (HS256 + JWKS).
 
 Email (`services/email_service.py`, Resend SMTP): submission receipts, every
@@ -94,8 +102,9 @@ the user's JWT on sign-in/refresh.
 - **Google OAuth** (PRD 5.1.1) — email/password only today.
 - **Phase 2**: AI mock interview (Anthropic API), mentorship, leaderboard,
   curated internship listings, Supabase Realtime queue updates.
-- **Tests** — no pytest suite. Four end-to-end smoke scripts run against a
-  live dev server: `smoke_admin.py` (moderation, flags, users),
+- **Tests** — no pytest suite. `check_validation.py` runs offline (schemas,
+  id/URL/date validation, admin-discipline and password-change guards, rate-limit
+  keying). Four end-to-end smoke scripts run against a live dev server: `smoke_admin.py` (moderation, flags, users),
   `smoke_companies.py` (admin company CRUD + merge), `smoke_managers.py`
   (per-company RBAC and queued profile edits), `smoke_profile.py` (real login,
   token refresh, My submissions, needs_edit → resubmit).

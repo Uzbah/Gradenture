@@ -1,4 +1,5 @@
 import logging
+import os
 
 from src.config.supabase import auth_client, supabase
 from src.dependencies.exceptions import AppError
@@ -145,8 +146,12 @@ def resend_verification(data: ResendVerificationSchema) -> dict:
 
 
 def forgot_password(data: ForgotPasswordSchema) -> dict:
+    # Without redirect_to Supabase sends users to the Site URL root, where the
+    # SPA bounces them to /login and the recovery token in the hash is lost.
+    # The URL must also be in Supabase Auth → URL Configuration → Redirect URLs.
+    redirect_to = f"{os.getenv('APP_URL', 'http://localhost:5173').rstrip('/')}/reset-password"
     try:
-        auth_client().auth.reset_password_email(data.email)
+        auth_client().auth.reset_password_email(data.email, {"redirect_to": redirect_to})
     except Exception:
         pass
 
@@ -155,7 +160,25 @@ def forgot_password(data: ForgotPasswordSchema) -> dict:
     }
 
 
+# Sessions from these flows already proved control of the inbox, which is what
+# the current password would prove. Everything else must re-enter it, so a
+# stolen access token alone can't lock the owner out.
+_INBOX_PROVEN = {"recovery", "otp", "magiclink"}
+
+
 def reset_password(user: dict, data: ResetPasswordSchema) -> dict:
+    if not _INBOX_PROVEN.intersection(user.get("amr", [])):
+        if not data.current_password:
+            raise AppError(400, {"errors": {"current_password": ["is required"]}})
+        try:
+            auth_client().auth.sign_in_with_password({
+                "email":    user.get("email") or "",
+                "password": data.current_password,
+            })
+        except Exception:
+            # 400, not 401: the frontend logs out on 401.
+            raise AppError(400, {"error": "Current password is incorrect"})
+
     try:
         supabase.auth.admin.update_user_by_id(
             user["sub"], {"password": data.password}

@@ -77,6 +77,12 @@ def send_company_edit_decision(
               f"Reason: {admin_note or 'No note was added.'}")
 
 
+def send_company_approved(to: str | None, company_name: str) -> None:
+    _send(to, f"{company_name} is now on Gradenture",
+          f"The company you proposed, {company_name}, was approved and can now be "
+          "picked when submitting questions and reviews.")
+
+
 def send_deadline_reminder(to: str | None, days: int, company_name: str, role_title: str, deadline: str) -> None:
     when = "tomorrow" if days == 1 else f"in {days} days"
     _send(to, f"Deadline {when}: {company_name} – Gradenture",

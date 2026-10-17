@@ -1,14 +1,19 @@
+from postgrest.exceptions import APIError
+
 from src.config.supabase import maybe_row, supabase
 from src.dependencies.exceptions import AppError
 from src.schemas.question_schema import FlagSchema, QuestionEditSchema, QuestionSchema
 from src.services import email_service
 from src.utils.sanitize import clean_text
 
-
-def _sanitize(q: dict, is_admin: bool = False) -> dict:
-    if not is_admin and q.get("is_anonymous"):
-        q.pop("submitted_by", None)
-    return q
+# Whitelist, not "*": keeps submitted_by (even on non-anonymous posts),
+# reviewed_by (which admin moderated it) and admin_note out of public responses.
+# ponytail: no author shown anywhere, so no author field; add a display name
+# (re-attributed to "Anonymous" for anonymous/banned authors) when that UI exists.
+PUBLIC_COLUMNS = (
+    "id, domain_id, company_id, role_title, question_text, question_type, "
+    "difficulty, asked_date, notes, upvotes, created_at"
+)
 
 
 def list_questions(
@@ -25,7 +30,7 @@ def list_questions(
 
     query = (
         supabase.table("interview_questions")
-        .select("*", count="exact")
+        .select(PUBLIC_COLUMNS, count="exact")
         .eq("status", "approved")
         .order("created_at", desc=True)
     )
@@ -40,19 +45,19 @@ def list_questions(
             query = query.eq(field, val)
 
     result = query.range(offset, offset + limit - 1).execute()
-    return {"data": [_sanitize(q) for q in result.data], "count": result.count}
+    return {"data": result.data, "count": result.count}
 
 
 def get_question(question_id: str) -> dict:
     row = maybe_row(
         supabase.table("interview_questions")
-        .select("*")
+        .select(PUBLIC_COLUMNS)
         .eq("id", question_id)
         .eq("status", "approved")
     )
     if not row:
         raise AppError(404, {"error": "Question not found"})
-    return {"data": _sanitize(row)}
+    return {"data": row}
 
 
 def submit_question(user: dict, data: QuestionSchema) -> dict:
@@ -107,48 +112,37 @@ def resubmit_question(user: dict, question_id: str, data: QuestionEditSchema) ->
 
 
 def upvote_question(user: dict, question_id: str) -> dict:
-    user_id = user["sub"]
+    # Atomic in Postgres (row lock + recount); NULL when not approved / missing.
+    result = supabase.rpc("toggle_upvote", {"qid": question_id, "uid": user["sub"]}).execute()
+    if not result.data:
+        raise AppError(404, {"error": "Question not found"})
+    return {"upvoted": result.data["upvoted"], "upvotes": result.data["upvotes"]}
 
-    existing = maybe_row(
-        supabase.table("question_upvotes")
-        .select("question_id")
-        .eq("question_id", question_id)
-        .eq("user_id", user_id)
-    )
 
-    if existing:
-        (
-            supabase.table("question_upvotes")
-            .delete()
-            .eq("question_id", question_id)
-            .eq("user_id", user_id)
-            .execute()
-        )
-        supabase.rpc("decrement_upvotes", {"qid": question_id}).execute()
-        upvoted = False
-    else:
-        supabase.table("question_upvotes").insert({
-            "question_id": question_id,
-            "user_id":     user_id,
+_FLAGGABLE = {"question": "interview_questions", "review": "interview_reviews"}
+
+
+def flag_content(user: dict, content_type: str, content_id: str, data: FlagSchema) -> dict:
+    """Shared by questions and reviews. Only live (approved) content is flaggable."""
+    if not maybe_row(
+        supabase.table(_FLAGGABLE[content_type]).select("id")
+        .eq("id", content_id).eq("status", "approved")
+    ):
+        raise AppError(404, {"error": f"{content_type.capitalize()} not found"})
+
+    try:
+        supabase.table("content_flags").insert({
+            "reported_by":  user["sub"],
+            "content_type": content_type,
+            "content_id":   content_id,
+            "reason":       clean_text(data.reason),
         }).execute()
-        supabase.rpc("increment_upvotes", {"qid": question_id}).execute()
-        upvoted = True
-
-    q = (
-        supabase.table("interview_questions")
-        .select("upvotes")
-        .eq("id", question_id)
-        .single()
-        .execute()
-    )
-    return {"upvoted": upvoted, "upvotes": q.data["upvotes"]}
+    except APIError as e:
+        if e.code == "23505":   # content_flags_one_open_per_user
+            raise AppError(409, {"error": "You have already flagged this"})
+        raise
+    return {"message": "Flagged for review"}
 
 
 def flag_question(user: dict, question_id: str, data: FlagSchema) -> dict:
-    supabase.table("content_flags").insert({
-        "reported_by":  user["sub"],
-        "content_type": "question",
-        "content_id":   question_id,
-        "reason":       data.reason,
-    }).execute()
-    return {"message": "Flagged for review"}
+    return flag_content(user, "question", question_id, data)

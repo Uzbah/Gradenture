@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic import BaseModel, EmailStr, field_validator
 
 
@@ -67,6 +69,8 @@ class RefreshSchema(BaseModel):
 
 class ResetPasswordSchema(BaseModel):
     password: str
+    # Required unless the session came from a recovery link (see auth_service).
+    current_password: Optional[str] = None
 
     @field_validator("password")
     @classmethod

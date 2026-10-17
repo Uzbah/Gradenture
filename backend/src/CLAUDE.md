@@ -17,6 +17,6 @@ dependencies/  schemas/          utils/ (sanitize)
 | `schemas/` | Pydantic request models | validation only, no I/O |
 | `dependencies/` | JWT auth, rate limiter, `AppError` | shared FastAPI `Depends` |
 | `config/` | Supabase client singleton | the only place the service-role key is read |
-| `utils/` | `clean_text()` | strip HTML from user text before insert |
+| `utils/` | `clean_text()` | strip control chars from user text before insert (no HTML stripping; React escapes) |
 
 `__init__.py` is empty. Conventions: responses are `{"data": ...}` or `{"message": ...}`; errors are `raise AppError(status, {"error": msg})`; every admin mutation calls `admin_service._audit()`.

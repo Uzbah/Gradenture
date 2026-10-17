@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from src.dependencies.auth import get_current_user
+from src.schemas.common import UUIDStr
 from src.services import prep_service
 
 router = APIRouter(prefix="/prep", tags=["Prep"])
@@ -31,8 +32,8 @@ def toggle_topic(
 def list_bank_questions(
     page: int = 1,
     limit: int = 20,
-    domain_id: str | None = None,
-    company_id: str | None = None,
+    domain_id: UUIDStr | None = None,
+    company_id: UUIDStr | None = None,
     role_title: str | None = None,
     q: str | None = None,
     question_type: str | None = None,

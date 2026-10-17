@@ -6,6 +6,7 @@ from src.dependencies.auth import get_current_user
 from src.dependencies.rate_limit import limiter, user_rate_key
 from src.schemas.question_schema import FlagSchema
 from src.schemas.review_schema import ReviewEditSchema, ReviewSchema
+from src.schemas.common import UUIDStr
 from src.services import reviews_service
 
 router = APIRouter(prefix="/reviews", tags=["Reviews"])
@@ -15,14 +16,14 @@ router = APIRouter(prefix="/reviews", tags=["Reviews"])
 def list_reviews(
     page: int = 1,
     limit: int = 20,
-    company_id: str | None = None,
-    domain_id: str | None = None,
+    company_id: UUIDStr | None = None,
+    domain_id: UUIDStr | None = None,
 ) -> dict:
     return reviews_service.list_reviews(page, limit, company_id, domain_id)
 
 
 @router.get("/{review_id}")
-def get_review(review_id: str) -> dict:
+def get_review(review_id: UUIDStr) -> dict:
     return reviews_service.get_review(review_id)
 
 
@@ -40,7 +41,7 @@ def submit_review(
 @limiter.limit("10/hour", key_func=user_rate_key)
 def resubmit_review(
     request: Request,
-    review_id: str,
+    review_id: UUIDStr,
     body: ReviewEditSchema,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:
@@ -51,7 +52,7 @@ def resubmit_review(
 @limiter.limit("10/hour", key_func=user_rate_key)
 def flag_review(
     request: Request,
-    review_id: str,
+    review_id: UUIDStr,
     body: FlagSchema,
     user: Annotated[dict, Depends(get_current_user)],
 ) -> dict:

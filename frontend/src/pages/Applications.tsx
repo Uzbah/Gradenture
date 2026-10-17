@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { api, Application } from "../api";
+import { api, Application, safeUrl } from "../api";
 
 const COLUMNS: { key: Application["status"]; label: string }[] = [
   { key: "applied", label: "Applied" },
@@ -56,7 +56,7 @@ export default function Applications() {
                 <strong>{app.company_name}</strong>
                 <div className="muted">{app.role_title}</div>
                 {app.deadline && <div className="muted">Deadline: {app.deadline}</div>}
-                {app.job_url && <div><a href={app.job_url} target="_blank" rel="noreferrer">Job link</a></div>}
+                {safeUrl(app.job_url) && <div><a href={safeUrl(app.job_url)} target="_blank" rel="noreferrer">Job link</a></div>}
                 {app.notes && <div className="muted" style={{ fontSize: "0.8rem" }}>{app.notes}</div>}
                 <div className="row mt">
                   <select

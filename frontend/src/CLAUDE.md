@@ -2,12 +2,11 @@
 
 > **Keep this file current.** If you add, remove, rename, or materially change any file in this folder, update this CLAUDE.md in the same change. A stale CLAUDE.md is worse than none.
 
-- `main.tsx` — entry: `BrowserRouter` → MUI `ThemeProvider` → `AuthProvider` → `App`. No `CssBaseline`; `index.css` owns base styles.
+- `main.tsx` — entry: `BrowserRouter` → `AuthProvider` → `App`. No UI library; `index.css` owns all styles.
 - `App.tsx` — all routes. `Layout` = sidebar shell + guards: not logged in → `/login`; onboarding incomplete → `/onboarding`. Admin nav link is role-gated, the `/admin` route itself is not (API returns 403).
-- `api.ts` — `api(path, {method, body, token})` fetch wrapper: Bearer token from `localStorage["token"]`, JSON or FormData body, flattens `{error}` / `{errors}` into `ApiError.message`, auto-logout + redirect on 401. Also the shared TS interfaces (`User`, `Question`, `Review`, `Company`, `Application`, `Flag`, `CompanyManager`, `CompanyEdit`).
+- `api.ts` — `api(path, {method, body, token})` fetch wrapper: Bearer token from `localStorage["token"]`, JSON or FormData body, flattens `{error}` / `{errors}` into `ApiError.message`, auto-logout + redirect on 401. `safeUrl()` returns a link only if it is http(s) — use it for every user-supplied `href`. Also the shared TS interfaces (`User`, `Question`, `Review`, `Company`, `Application`, `Flag`, `CompanyManager`, `CompanyEdit`).
 - `auth.tsx` — `AuthProvider` / `useAuth()`: `user`, `loading`, `login`, `logout`, `refresh` (`GET /users/me`).
-- `lookups.ts` — `useLookups()`: domains + first 50 companies, `domainName(id)` / `companyName(id)`.
-- `theme.ts` — MUI theme mirroring the mono-lime CSS variables.
+- `lookups.ts` — `useLookups()`: domains + every approved company (paged, cached for the session), `domainName(id)` / `companyName(id)`, `reloadCompanies()`.
 - `index.css` — all styling: `:root` tokens, `.shell`/`.sidebar`, `.card`, `.badge`, `.kanban`, forms.
 - `vite-env.d.ts` — Vite client types.
 - `components/`, `pages/` — see their CLAUDE.md.

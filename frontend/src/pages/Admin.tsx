@@ -476,7 +476,8 @@ function Users() {
               <td>{u.onboarding_complete ? "✓" : "—"}</td>
               <td>{u.suspended_at ? <span className="badge hard">suspended</span> : "active"}</td>
               <td>
-                {u.id !== me?.id && (
+                {/* plain admins may only suspend plain users (API-enforced too) */}
+                {u.id !== me?.id && (isSuper || u.role === "user") && (
                   u.suspended_at ? (
                     <button className="small secondary" onClick={() => unsuspend(u.id)}>Unsuspend</button>
                   ) : (
